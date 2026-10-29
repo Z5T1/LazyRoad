@@ -1,33 +1,80 @@
 package com.creadri.lazyroad;
 
-import java.io.Serializable;
-
-/**
- *
- * @author creadri
- */
-public class PillarPart implements Comparable<PillarPart>, Serializable {
-
-    private int[][] ids;
-    private byte[][] datas;
+public class PillarPart {
+    private String[][] baseBlockDatas;
+    private int baseHeight;
+        private int repeatEvery;
+    private String[][] blockDatas;
     private int height;
     private int width;
-    private int repeatEvery;
     private int buildUntil;
+    private boolean startHere;
+    private java.util.List<Integer> triggerPositions;
+    private Integer playerOffset;
+
+        public String[][] getBaseBlockDatas() {
+        return baseBlockDatas;
+    }
+
+    public void setBaseBlockDatas(String[][] baseBlockDatas) {
+        this.baseBlockDatas = baseBlockDatas;
+    }
+
+    public int getBaseHeight() {
+        return baseHeight;
+    }
+
+    public void setBaseHeight(int baseHeight) {
+        this.baseHeight = baseHeight;
+    }
+
+        public int getRepeatEvery() {
+        return repeatEvery;
+    }
+    public void setRepeatEvery(int repeatEvery) {
+        this.repeatEvery = repeatEvery;
+    }
+    public PillarPart() {}
 
     public PillarPart(int height, int width) {
-        ids = new int[height][width];
-        datas = new byte[height][width];
-        this.width = width;
+        blockDatas = new String[height][width];
         this.height = height;
+        this.width = width;
     }
 
-    public boolean isToBuild(int count, int maxSequence) {
-        return ((count % maxSequence) % repeatEvery) == 0;
+    public String[][] getBlockDatas() {
+        return blockDatas;
     }
 
-    public boolean isToBuild(int count) {
-        return count % repeatEvery == 0;
+    public void setBlockDatas(String[][] blockDatas) {
+        this.blockDatas = blockDatas;
+    }
+
+    public int getPlayerOffset() {
+        if (playerOffset != null) {
+            return playerOffset;
+        }
+        return width / 2;
+    }
+
+    public void setPlayerOffset(Integer playerOffset) {
+        this.playerOffset = playerOffset;
+    }
+
+    public java.util.List<Integer> getTriggerPositions() {
+        return triggerPositions;
+    }
+
+    public void setTriggerPositions(java.util.List<Integer> triggerPositions) {
+        this.triggerPositions = triggerPositions;
+    }
+
+    public boolean isStartHere() {
+        return startHere;
+    }
+
+    public void setStartHere(boolean startHere) {
+        this.startHere = startHere;
     }
 
     public int getBuildUntil() {
@@ -38,18 +85,6 @@ public class PillarPart implements Comparable<PillarPart>, Serializable {
         this.buildUntil = buildUntil;
     }
 
-    public byte[] getData(int height) {
-        return datas[height];
-    }
-
-    public byte[][] getDatas() {
-        return datas;
-    }
-
-    public void setDatas(byte[][] datas) {
-        this.datas = datas;
-    }
-
     public int getHeight() {
         return height;
     }
@@ -58,62 +93,11 @@ public class PillarPart implements Comparable<PillarPart>, Serializable {
         this.height = height;
     }
 
-    public int[] getId(int height) {
-        return ids[height];
-    }
-
-    public int[][] getIds() {
-        return ids;
-    }
-
-    public void setIds(int[][] ids) {
-        this.ids = ids;
-    }
-
-    public int getRepeatEvery() {
-        return repeatEvery;
-    }
-
-    public void setRepeatEvery(int repeatEvery) {
-        this.repeatEvery = repeatEvery;
-    }
-
     public int getWidth() {
         return width;
     }
 
     public void setWidth(int width) {
         this.width = width;
-    }
-
-    public void setSize(int newWidth, int newHeight) {
-
-        int[][] newids = new int[newHeight][newWidth];
-        byte[][] newdatas = new byte[newHeight][newWidth];
-
-        int imax = Math.min(height, newHeight);
-        int jmax = Math.min(width, newWidth);
-
-        for (int i = 0; i < imax; i++) {
-            for (int j = 0; j < jmax; j++) {
-                newids[i][j] = ids[i][j];
-                newdatas[i][j] = datas[i][j];
-            }
-        }
-
-        ids = newids;
-        datas = newdatas;
-        width = newWidth;
-        height = newHeight;
-    }
-
-    @Override
-    public int compareTo(PillarPart o) {
-        return o.repeatEvery - repeatEvery;
-    }
-
-    @Override
-    public String toString() {
-        return "Pillar Part " + Integer.toString(repeatEvery);
     }
 }

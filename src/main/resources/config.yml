@@ -44,8 +44,12 @@ messages:
   lazyminer:
     enable: "&bLazyMiner mode enabled."
     disable: "&bLazyMiner mode disabled."
-    empty: "&4That's the last of it."
+    empty: "&aAll stored items have been deposited into the chest."
+    emptyStore: "&bYou do not have any stored items to deposit."
     notempty: "&4There's still &6%0&4 stacks of items left to put somewhere."
+    chestFull: "&cThis chest is full! None of your items could fit. Look at another chest and run &6/lm store&c again."
+    chestPartialFull: "&cThe chest is now full! &6%0&c stacks of items still remain. Look at another chest and run &6/lm store&c to deposit the rest."
+    notChest: "&cMust be looking at a chest for LazyRoad to put drops in."
     drops: "&bEnable LazyMiner to run this command."
     stop: "&4You now have &6%0&4 stacks of items stored."
     addid: "&6%0&4 has been added to the blocks ids LazyMiner Mines."

@@ -1,8 +1,15 @@
 package com.creadri.lazyroad;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+
 import java.io.*;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import org.bukkit.entity.Player;
@@ -13,6 +20,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 /**
  * Handle events for all Player related events
@@ -24,13 +33,6 @@ public class LazyRoadPlayerListener implements Listener {
     private final LazyRoad plugin;
     private HashMap<String, RoadEnabled> builders;
     private HashMap<String, Stack<Undo>> undoers;
-    private FilenameFilter filenameFilter = new FilenameFilter() {
-
-        @Override
-        public boolean accept(File dir, String name) {
-            return name.endsWith(".ser");
-        }
-    };
 
     /**
      *
@@ -75,54 +77,50 @@ public class LazyRoadPlayerListener implements Listener {
 
         removeBuilder(player);
 
-        //LazyRoad.messages.sendPlayerMessage(event.getPlayer(), "messages.teleported");
         event.getPlayer().sendMessage(plugin.getMessage("messages.teleported"));
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        File pl = null;
-        File MinerFolder = new File(plugin.getDataFolder(), "miners");
-        try {
-            if (!MinerFolder.mkdir()) {
-                File[] pls = MinerFolder.listFiles(filenameFilter);
-                if (pls.length > 0) {
-                    for (File file : pls) {
-                        if (file.getName().equalsIgnoreCase(player.getName().toLowerCase() + ".ser")) {
-                            pl = file;
-                            break;
+        File minerFolder = new File(plugin.getDataFolder(), "miners");
+        if (!minerFolder.exists()) {
+            minerFolder.mkdirs();
+        }
+        File saveFile = new File(minerFolder, player.getName() + ".yml");
+        if (saveFile.exists()) {
+            try {
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(saveFile);
+                boolean enabled = yaml.getBoolean("enabled", false);
+                List<?> list = yaml.getList("drops");
+                Map<Integer, ItemStack> drops = new HashMap<Integer, ItemStack>();
+                if (list != null) {
+                    int idx = 0;
+                    for (Object obj : list) {
+                        if (obj instanceof ItemStack) {
+                            drops.put(idx++, (ItemStack) obj);
                         }
                     }
-                    if (pl == null)
-                    	return;
-
-                    ObjectInputStream ois = new ObjectInputStream(new FileInputStream(pl));
-
-                    Object raw = ois.readObject();
-                    if (raw instanceof Map) {
-                        MinerData minerData = MinerData.deserialize((Map<String, Object>) raw);
-                        if (!player.hasPermission("lazyroad.lazyminer")) {
-                            minerData.setEnabled(false);
-                        }
-                        plugin.putLazyMiner(player.getName(), new LazyMiner(plugin, player, minerData));
-                    }
-                    ois.close();
-
                 }
+                int[] checkIds = plugin.getCheckIds();
+                MinerData minerData = new MinerData(checkIds != null ? checkIds : new int[0], drops, enabled);
+                if (!player.hasPermission("lazyroad.lazyminer")) {
+                    minerData.setEnabled(false);
+                }
+                plugin.putLazyMiner(player.getName(), new LazyMiner(plugin, player, minerData));
+            } catch (Exception ex) {
+                plugin.log.warning("[LazyRoad] Could not load miner data for " + player.getName() + ": " + ex.getMessage());
             }
-        } catch (IOException iOException) {
-        	LazyRoad.log.warning("[LazyRoad] An error occured while opening the Miner file " + event.getPlayer().getName() + ".ser !");
-        } catch (ClassNotFoundException ex) {
-        	LazyRoad.log.warning("[LazyRoad] An error occured while parsing the Miner file " + event.getPlayer().getName() + ".ser !");
-        } catch (SecurityException e) {
-        	LazyRoad.log.warning("[LazyRoad] Permission denied while parsing the Miner file " + event.getPlayer().getName() + ".ser !");
         }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerLeave(PlayerQuitEvent event) {
-        plugin.removeMiner(event.getPlayer().getName());
+        LazyMiner lm = plugin.getLazyMiner(event.getPlayer().getName());
+        if (lm != null) {
+            lm.saveMinerData();
+            plugin.removeMiner(event.getPlayer().getName());
+        }
     }
 
     public boolean addBuilder(String player, RoadEnabled road) {
@@ -132,6 +130,10 @@ public class LazyRoadPlayerListener implements Listener {
 
         builders.put(player, road);
         return true;
+    }
+
+    public RoadEnabled getBuilder(String player) {
+        return builders.get(player);
     }
 
     public RoadEnabled setForceUp(String player) {
@@ -201,60 +203,33 @@ public class LazyRoadPlayerListener implements Listener {
     }
 
     public void serializeRoadsUndos(File file) {
-
-        // saving the builders
         Iterator<String> itPlayers = ((HashMap<String, RoadEnabled>) builders.clone()).keySet().iterator();
         while (itPlayers.hasNext()) {
             removeBuilder(itPlayers.next());
         }
-
-        ObjectOutputStream oos = null;
         try {
-            file.createNewFile();
-
-            oos = new ObjectOutputStream(new FileOutputStream(file));
-            oos.writeObject(undoers);
-        } catch (IOException ex) {
+            Gson gson = new Gson();
+            String json = gson.toJson(undoers);
+            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+        } catch (java.io.IOException ex) {
             LazyRoad.log.warning("[LazyRoad] Unable to save undo file.");
-        } finally {
-            if (oos != null) {
-                try {
-                    oos.close();
-                } catch (IOException ex) {
-                }
-            }
         }
     }
 
-    public void unSerializeRoadsUndos(File file) {
-
-        ObjectInputStream ois = null;
-        try {
-            ois = new ObjectInputStream(new FileInputStream(file));
-            undoers = (HashMap<String, Stack<Undo>>) ois.readObject();
-            ois.close();
-
-            Iterator<Stack<Undo>> it = undoers.values().iterator();
-            while (it.hasNext()) {
-                Iterator<Undo> itUndo = it.next().iterator();
-                while (itUndo.hasNext()) {
-                    Undo undo = itUndo.next();
-                    undo.setWorld(plugin.getServer().getWorld(undo.getsWorld()));
-                }
-            }
-
-
-        } catch (Exception ex) {
-            LazyRoad.log.warning("[LazyRoad] Unable to load undo file. Only worry if this happens after you've build a road.");
-            undoers = new HashMap<String, Stack<Undo>>();
-        } finally {
-            if (ois != null) {
-                try {
-                    ois.close();
-                } catch (IOException ex) {
-                }
-            }
+    public void deserializeRoadsUndos(File file) {
+        if (!file.exists()) {
+            return;
         }
-
+        try {
+            Gson gson = new Gson();
+            String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            Type mapType = new TypeToken<HashMap<String, Stack<Undo>>>(){}.getType();
+            undoers = gson.fromJson(json, mapType);
+            if (undoers == null) {
+                undoers = new HashMap<String, Stack<Undo>>();
+            }
+        } catch (Exception ex) {
+            LazyRoad.log.warning("[LazyRoad] Unable to read undo file.");
+        }
     }
 }

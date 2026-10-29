@@ -1,3 +1,64 @@
+Version 0.9.3
+* Template Extraction & File Resilience:
+Resilient Default Template Extraction: Isolated zip extraction per template so file permission errors or locks on individual templates do not abort the extraction of the remaining roads and pillars.
+Identical Content Optimization: Skips writing to disk if an existing template already matches the built-in archive content, preventing unnecessary filesystem writes and avoiding permission errors on read-only templates.
+File Permission Recovery: Automatically attempts to make existing templates writable before updating when file permissions are restricted.
+Stream & Security Hardening: Streamlined archive handling using try-with-resources to prevent dangling locks, and added path traversal guards against zip-slip vulnerabilities.
+
+Version 0.9.2
+* Core Enhancements & Pillar/Bridge Engine:
+Bridge & Pillar Synchronization: Resolved an architectural desynchronization between Road and Pillar sequence counters. Synchronized 1:1 part-per-step evaluation logic in Road with Pillar so bridge decks and multi-part pillar columns remain in exact lockstep from step 0.
+Classic Pillar Arch Re-creation: Modernized the classic 2011 Classic5 archway template to native JSON using explicit triggerPositions, faithfully preserving the arch slope (steps 3-13), ground pillar foundations (steps 7-8), and open spans (steps 1-2).
+Pillar Step Evaluation Overhaul: Standardized repeatEvery and triggerPositions evaluation across all default pillar structures (Basic, BigBridge, Classic5, Fence5, OuterWall, Round3, Wall).
+
+* Mining & Drops Consolidation:
+LazyMiner Consolidation: Consolidated excavated block collection and drop mechanics into LazyMiner (/lm / /lazyminer) to eliminate duplicated functionality and provide granular administrative permissions (lazyroad.lazyminer).
+Container Full & Partial Fill Warnings: Implemented real-time inventory validation for /lm store. Players receive immediate alerts when their designated storage container is completely full or partially full, including the exact count of remaining item stacks that could not fit.
+
+* Controls & User Interface:
+Command Shortcut & Auto-Fill Parity: Fixed tab completion and auto-fill across all command aliases (/lr, /road, /lb, /bridge, /lt, /tunnel, /lm, /lazyminer), dynamically providing contextual subcommands and arguments for every shortcut.
+Strict Straight Road Enforcement: Fixed straight mode initialization and toggle messaging (/lr straight), ensuring player movement vectors strictly snap and lock road placement along cardinal directions.
+
+* LazyRoad Web Designer:
+Dynamic Canvas Scaling: Canvas automatically expands height and width for tall structures (>= 13 blocks) and wide profiles, eliminating row/column clipping.
+Scrollable Viewport Container: Added a dedicated scroll container with custom Dracula-themed scrollbars for smooth navigation of large designs while keeping tools docked.
+Drag-to-Paint & Erase: Added mouse drag painting and right-click erasing across multiple cells, while maintaining the click eyedropper when the block material input is empty.
+
+* Template Additions & Updates:
+New Birch5 Road Template: Added a birch log and plank variant of the Wood5 road.
+Refreshed Default Templates: Updated defaultRoads.zip and defaultPillars.zip with all tested and refined road and pillar templates.
+Interactive Regression Testing: Added an interactive browser-based TESTING_CHECKLIST.html suite alongside the markdown checklist.
+
+Version 0.9.1
+* Core Enhancements & Modernization:
+Smart Template Updates: Built custom resource extraction logic to ensure that whenever the plugin is updated, the official built-in templates (defaultRoads.zip, defaultPillars.zip) automatically refresh and overwrite legacy versions transparently, without deleting user-created custom JSON files.
+
+* New Features & Designer App:
+LazyRoad Master Web Designer: Created a full-fledged external web UI designer (designer/index.html) giving users a visual point-and-click grid to author and paint road layers, design custom stairs, and build pillar architectures.
+
+Designer Block State Modifiers: Implemented robust directional handling and block state tooling in the Designer allowing for Top/Bottom half variants, Hanging, and automatic cardinal block rotation wrapping logic on corner elements.
+
+Pillar Build Limits: Added a new Build Max Lim feature into Pillar data structures. This allows builders to cap pillar column drops exactly X blocks below a bridge specifically to form sweeping artistic arches, or set to 0 to keep generating continuously until snapping to solid ground.
+
+* Bug Fixes & System Stability:
+Restored Terrain Wrapping (The "Cliff-Climbing" Fix): Fixed a critical mathematical regression within the drawCorner intersection geometry. Winding or zigzagging dirt paths upward now natively increment the pathing count instead of erroneously tripping the internal maxGradient tracker into a permanent flatline freeze.
+
+Tunnel Environmental Carving: Altered the putBlock mechanic to finally correctly interpret explicit "minecraft:air" allocations. Normal roads (/lr) will safely pass over these nodes to protect underlying environmental features (and safety scaffolds), whereas specific tunneling (/lr tunnel) cleanly bores through solid mountains.
+
+Corrupted Template Fault-Tolerance: Adjusted putBlock to gracefully swallow IllegalArgumentExceptions on block generation. If a user makes a typo in their custom JSON road template (e.g. minecraft:lantern_slab), the plugin will now silently pass over the invalid block rather than triggering a server exception stacktrace that crashes the road generation.
+
+Version 0.9.0
+This commits a massive architectural overhaul to bring the LazyRoad engine up to modern (1.13+) ecosystem standards natively targeting Java 21, resolving block registration bounds, and expanding generation logic.
+
+Key Changes:
+* JSON Templates: Eliminated the broken legacy `.ser` binary files. Engine now extracts and parses natively editable `.json` layouts for 10 roads and 6 pillars. Uses modern string namespaces (e.g. `minecraft:stone`) ensuring forward compatibility with brand new Minecraft blocks without requiring SDK recompiles.
+* Directional Block Support: Modern orientable blocks (stairs, fences, hanging lanterns) natively calculate structural rotation based on dynamically changing road paths (North/South/East/West).
+* Tunnel Engine Refactor (`/lt`): Sub-engine now generates a volumetric bounding box that precisely carves and clears blocks ahead of the player rather than just bypassing placement. Added a `/lr drops` toggle to toggle dropping excavated blocks as actual items.
+* Tunnel Render Fix: Injected synthetic BlockDamageEvents to force-trigger adjacent engine updates specifically fixing block state masking problems with anti-xray plugins like Orebfuscator.
+* Bridge Engine Fix (`/lb`): Properly mapped flag overrides in the command router and shaved off dead "invisible" block data at the bottom of pillar arrays allowing suspension cables to correctly anchor down to the physical terrain.
+* Infinite Undo Restoration (`/lr undo`): Engine now scales using dynamic `ArrayList`s instead of hard-capped buffer sizes. Restructured the timeline array to restore chronologically backward (LIFO), perfectly reverting structurally complex tasks like Tunneling without leaving displaced air cavities.
+* Updated Pom.yml SDK targeting and rewrote the README.md to accurately document JSON parameters and modern command syntax.
+
 Version 0.8.2
 
     Made road and pillar names case insensitive

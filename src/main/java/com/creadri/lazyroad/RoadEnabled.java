@@ -1,8 +1,11 @@
 package com.creadri.lazyroad;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 
 /**
@@ -12,12 +15,14 @@ import org.bukkit.entity.Player;
 public class RoadEnabled {
 
     private Road road;
+    private Player player;
     private Pillar pillar = null;
     private int count;
     private int lastBuiltStairs = -1;
     private boolean hasBuilt = false;
     private boolean tunnel = false;
-    private boolean straight = true;
+    private boolean bridge = false;
+    private boolean straight = false;
     private boolean forceUp = false;
     private boolean forceDown = false;
     private int oldX;
@@ -30,6 +35,7 @@ public class RoadEnabled {
     private LazyMiner lm = null;
 
     public RoadEnabled(Player player, Road road, LazyRoad plugin) {
+        this.player = player;
         Location loc = player.getLocation();
         this.world = loc.getWorld();
         this.oldX = loc.getBlockX();
@@ -71,6 +77,22 @@ public class RoadEnabled {
         // player current coordinates
         int x = playerLocation.getBlockX();
         int z = playerLocation.getBlockZ();
+        
+        if (bridge && hasBuilt) {
+            float yaw = playerLocation.getYaw();
+            if (yaw < 0) {
+                yaw += 360;
+            }
+            if (yaw >= 315 || yaw < 45) { // south
+                z += 1;
+            } else if (yaw < 135) { // west
+                x -= 1;
+            } else if (yaw < 225) { // north
+                z -= 1;
+            } else { // east
+                x += 1;
+            }
+        }
 
         // do not bother check the height
         if (x == oldX && z == oldZ) {
@@ -79,6 +101,15 @@ public class RoadEnabled {
 
         // get y coordinate
         int y = getYFirstBlock(x, playerLocation.getBlockY(), z);
+
+        // bridge mode forces straight and just preserves y
+        if (bridge) {
+            straight = true;
+            if (hasBuilt) {
+                y = oldY;
+            }
+        }
+
 
         // constraint the y by the tunnel mode or to make stairs
         if (hasBuilt && tunnel && !forceUp && !forceDown) {
@@ -111,76 +142,52 @@ public class RoadEnabled {
 
         switch (dir) {
             case EAST:
-                // checking if going backward or heading to opposite direction
                 if ((hasBuilt && (oldZ - z) <= 0) || oldDir == Direction.WEST) {
                     return;
                 }
-                // constraint if it's going straight
                 if (straight) {
                     x = oldX;
                 }
-
                 if (drawCorner(x, y, z, dir)) {
                     return;
                 }
-
-                // draw this stupid road
                 drawEast(x, y, z, tunnel);
-
                 break;
             case NORTH:
-                // checking if going backward or heading to opposite direction
                 if ((hasBuilt && (oldX - x) <= 0) || oldDir == Direction.SOUTH) {
                     return;
                 }
-                // constraint if it's going straight
                 if (straight) {
                     z = oldZ;
                 }
-
                 if (drawCorner(x, y, z, dir)) {
                     return;
                 }
-
-                // draw this stupid road
                 drawNorth(x, y, z, tunnel);
-
                 break;
             case SOUTH:
-                // checking if going backward or heading to opposite direction
                 if ((hasBuilt && (x - oldX) <= 0) || oldDir == Direction.NORTH) {
                     return;
                 }
-                // constraint if it's going straight
                 if (straight) {
                     z = oldZ;
                 }
-
                 if (drawCorner(x, y, z, dir)) {
                     return;
                 }
-
-                // draw this stupid road
                 drawSouth(x, y, z, tunnel);
-
                 break;
             case WEST:
-                // checking if going backward or heading to opposite direction
                 if ((hasBuilt && (z - oldZ) <= 0) || oldDir == Direction.EAST) {
                     return;
                 }
-                // constraint if it's going straight
                 if (straight) {
                     x = oldX;
                 }
-
                 if (drawCorner(x, y, z, dir)) {
                     return;
                 }
-
-                // draw this stupid road
                 drawWest(x, y, z, tunnel);
-
                 break;
         }
 
@@ -201,55 +208,191 @@ public class RoadEnabled {
     }
 
     private Direction getDirection(Location loc) {
-        // get the direction of the player N, S, W, E
         float rot = loc.getYaw() % 360;
         if (rot < 0) {
             rot += 360;
         }
-
         if ((rot >= 0 && rot < 45) || (rot >= 315 && rot <= 360)) {
-            // WEST
             return Direction.WEST;
         } else if (rot >= 45 && rot < 135) {
-            // NORTH
             return Direction.NORTH;
         } else if (rot >= 135 && rot < 225) {
-            // EAST
             return Direction.EAST;
         } else if (rot >= 225 && rot < 315) {
-            // SOUTH
             return Direction.SOUTH;
         }
         return null;
     }
 
-    private void putBlock(int x, int y, int z, int id, byte data, Direction dir) {
-        if (id == -1) {
+    private void putBlock(int x, int y, int z, String stringData, Direction dir) {
+        if (stringData == null) {
             return;
         }
 
         Block b = world.getBlockAt(x, y, z);
-
-        if (b.getTypeId() == id && b.getData() == data) {
-            return;
+        try {
+            BlockData targetData = Bukkit.getServer().createBlockData(stringData);
+            if (targetData instanceof org.bukkit.block.data.Directional) {
+                org.bukkit.block.data.Directional dirData = (org.bukkit.block.data.Directional) targetData;
+                org.bukkit.block.BlockFace newFace = dirData.getFacing();
+                int rotations = 0;
+                switch(dir) {
+                      case WEST: rotations = 0; break;
+                      case NORTH: rotations = 1; break;
+                      case EAST: rotations = 2; break;
+                      case SOUTH: rotations = 3; break;
+                  }
+                for (int i=0; i<rotations; i++) {
+                    switch(newFace) {
+                        case NORTH: newFace = org.bukkit.block.BlockFace.EAST; break;
+                        case EAST: newFace = org.bukkit.block.BlockFace.SOUTH; break;
+                        case SOUTH: newFace = org.bukkit.block.BlockFace.WEST; break;
+                        case WEST: newFace = org.bukkit.block.BlockFace.NORTH; break;
+                        case NORTH_EAST: newFace = org.bukkit.block.BlockFace.SOUTH_EAST; break;
+                        case SOUTH_EAST: newFace = org.bukkit.block.BlockFace.SOUTH_WEST; break;
+                        case SOUTH_WEST: newFace = org.bukkit.block.BlockFace.NORTH_WEST; break;
+                        case NORTH_WEST: newFace = org.bukkit.block.BlockFace.NORTH_EAST; break;
+                        default: break;
+                    }
+                }
+                try { dirData.setFacing(newFace); targetData = dirData; } catch (Exception e) {}
+            }
+            if (b.getBlockData().matches(targetData)) return;
+            undo.put(b);
+            if (!b.getType().isAir()) {
+                LazyMiner miner = plugin.getLazyMiner(player.getName());
+                if (miner != null && miner.enabled() && player.hasPermission("lazyroad.lazyminer")) {
+                    miner.SaveBlock(b);
+                }
+            }
+            if (!bridge && !b.getType().isAir() && (targetData.getMaterial().isAir() || targetData.getMaterial().isTransparent())) {
+                try {
+                    org.bukkit.event.block.BlockDamageEvent event = new org.bukkit.event.block.BlockDamageEvent(
+                        player, b, player.getInventory().getItemInMainHand(), true
+                    );
+                    org.bukkit.Bukkit.getPluginManager().callEvent(event);
+                } catch (Exception ignored) {}
+            }
+            b.setBlockData(targetData, true);
+        } catch (IllegalArgumentException ex) {
+            // Silently ignore invalid block data strings like "minecraft:lantern_slab" produced by custom templates
+        }
+    }
+    private void drawPillar(PillarPart pillarPart, int x, int z, int topY, Direction dir, boolean tunnel, boolean bridge) {
+        if (pillarPart == null) return;
+        int width = pillarPart.getWidth();
+        int coreHeight = pillarPart.getHeight();
+        int baseHeight = pillarPart.getBaseHeight();
+        String[][] coreBlocks = pillarPart.getBlockDatas();
+        String[][] baseBlocks = pillarPart.getBaseBlockDatas();
+        int buildUntil = pillarPart.getBuildUntil();
+        if (buildUntil == 0) {
+            buildUntil = Integer.MAX_VALUE;
         }
 
-        if (lm != null) {
-            if (lm.enabled()) {
-                if (!lm.SaveBlock(b)) {
-                    undo.putBlock(b);
+        int pillarX = x;
+        int pillarZ = z;
+        if (dir == Direction.NORTH || dir == Direction.SOUTH) {
+            pillarX = (tunnel || bridge) ? (dir == Direction.NORTH ? x - 1 : x + 1) : x;
+        } else {
+            pillarZ = (tunnel || bridge) ? (dir == Direction.WEST ? z + 1 : z - 1) : z;
+        }
+
+        int offset = pillarPart.getPlayerOffset();
+
+        // Probe downward from topY to locate ground
+        int groundY = -1;
+        for (int probeY = topY; probeY > 0; probeY--) {
+            boolean hitSolid = false;
+            for (int j = 0; j < width; j++) {
+                int px = pillarX;
+                int pz = pillarZ;
+                if (dir == Direction.NORTH) pz = z + offset - j;
+                else if (dir == Direction.SOUTH) pz = z - offset + j;
+                else if (dir == Direction.WEST) px = x + offset - j;
+                else if (dir == Direction.EAST) px = x - offset + j;
+
+                if (!isToIgnoreForPillar(world.getBlockAt(px, probeY, pz))) {
+                    hitSolid = true;
+                    break;
                 }
-            } else {
-                undo.putBlock(b);
+            }
+            if (hitSolid) {
+                groundY = probeY;
+                break;
+            }
+        }
+
+        int availableGap = groundY >= 0 ? (topY - groundY) : (topY);
+
+        if (baseHeight > 0 && baseBlocks != null) {
+            // 1. Build the base from the ground up
+            int baseBottomY = groundY + 1;
+            if (availableGap <= baseHeight) {
+                // Gap is smaller than or equal to base: build from bottom up towards road and stop
+                for (int curY = baseBottomY; curY <= topY; curY++) {
+                    int baseLayer = curY - baseBottomY; // 0 = bottom-most layer touching ground
+                    if (baseLayer >= baseHeight) break;
+                    int row = baseHeight - 1 - baseLayer;
+                    drawPillarLayer(baseBlocks[row], width, offset, pillarX, curY, pillarZ, z, x, dir);
+                }
+                return;
+            }
+
+            // Full base fits on the ground
+            for (int mh = 0; mh < baseHeight; mh++) {
+                int curY = baseBottomY + (baseHeight - 1 - mh);
+                drawPillarLayer(baseBlocks[mh], width, offset, pillarX, curY, pillarZ, z, x, dir);
+            }
+
+            // 2. Build the top pillar core downwards from topY
+            // If buildUntil is specified (> 0), core only extends down by at most buildUntil blocks.
+            // Any space between the bottom of the core and the top of the base remains air (intentional opening/gap).
+            int coreBottomLimitY = baseBottomY + baseHeight;
+            if (buildUntil < Integer.MAX_VALUE) {
+                int maxCoreY = topY - buildUntil + 1;
+                if (maxCoreY > coreBottomLimitY) {
+                    coreBottomLimitY = maxCoreY;
+                }
+            }
+
+            int coreLayer = 0;
+            for (int curY = topY; curY >= coreBottomLimitY; curY--) {
+                int row = coreLayer >= coreHeight ? (coreHeight - 1) : coreLayer;
+                drawPillarLayer(coreBlocks[row], width, offset, pillarX, curY, pillarZ, z, x, dir);
+                coreLayer++;
             }
         } else {
-            undo.putBlock(b);
+            // No base defined: repeating core builds down from topY until ground or buildUntil
+            int totalLimit = Math.min(availableGap, buildUntil);
+            int coreLayer = 0;
+            for (int curY = topY; curY > 0 && curY > (topY - totalLimit); curY--) {
+                int row = coreLayer >= coreHeight ? (coreHeight - 1) : coreLayer;
+                drawPillarLayer(coreBlocks[row], width, offset, pillarX, curY, pillarZ, z, x, dir);
+                coreLayer++;
+            }
         }
+    }
 
+    private void drawPillarLayer(String[] rowData, int width, int offset, int pillarX, int curY, int pillarZ, int z, int x, Direction dir) {
+        if (rowData == null || curY <= 0) return;
+        for (int j = 0; j < width; j++) {
+            String blockData = rowData[j];
+            if (blockData != null && !blockData.equals("minecraft:air")) {
+                int px = pillarX;
+                int pz = pillarZ;
+                if (dir == Direction.NORTH) pz = z + offset - j;
+                else if (dir == Direction.SOUTH) pz = z - offset + j;
+                else if (dir == Direction.WEST) px = x + offset - j;
+                else if (dir == Direction.EAST) px = x - offset + j;
 
-        LRBlockData nb = new LRBlockData(id, data, dir, false);
-
-        b.setTypeIdAndData(nb.getId(), nb.getData(), false);
+                Block block = world.getBlockAt(px, curY, pz);
+                if (isToIgnoreForPillar(block)) {
+                    undo.put(block);
+                    putBlock(px, curY, pz, blockData, dir);
+                }
+            }
+        }
     }
 
     private int getYFirstBlock(int x, int y, int z) {
@@ -286,28 +429,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX - a, newY, oldZ + j, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX - a, newY, oldZ + j, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX - j, newY, oldZ - a + j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX - j, newY, oldZ - a + j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX + j + 1, newY, oldZ - a - 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX + j + 1, newY, oldZ - a - 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldZ = oldZ - (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldZ = oldZ - ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.NORTH && dir == Direction.WEST) {
@@ -319,28 +462,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX - a, newY, oldZ - j, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX - a, newY, oldZ - j, blockDataRow[jmax - j], oldDir);
                     }
                     // west shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX - j, newY, oldZ + a - j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX - j, newY, oldZ + a - j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX + j + 1, newY, oldZ + a + 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX + j + 1, newY, oldZ + a + 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldZ = oldZ + (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldZ = oldZ + ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.SOUTH && dir == Direction.EAST) {
@@ -352,28 +495,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX + a, newY, oldZ + j, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX + a, newY, oldZ + j, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX + j, newY, oldZ - a + j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX + j, newY, oldZ - a + j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX - j - 1, newY, oldZ - a - 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX - j - 1, newY, oldZ - a - 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldZ = oldZ - (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldZ = oldZ - ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.SOUTH && dir == Direction.WEST) {
@@ -385,28 +528,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX + a, newY, oldZ - j, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX + a, newY, oldZ - j, blockDataRow[jmax - j], oldDir);
                     }
                     // west shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX + j, newY, oldZ + a - j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX + j, newY, oldZ + a - j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX - j - 1, newY, oldZ + a + 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX - j - 1, newY, oldZ + a + 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldZ = oldZ + (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldZ = oldZ + ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.EAST && dir == Direction.NORTH) {
@@ -418,28 +561,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX + j, newY, oldZ - a, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX + j, newY, oldZ - a, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX - a + j, newY, oldZ - j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX - a + j, newY, oldZ - j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX - a - 1, newY, oldZ + j + 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX - a - 1, newY, oldZ + j + 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldX = oldX - (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldX = oldX - ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.EAST && dir == Direction.SOUTH) {
@@ -451,28 +594,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX - j, newY, oldZ - a, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX - j, newY, oldZ - a, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX + a - j, newY, oldZ - j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX + a - j, newY, oldZ - j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX + a + 1, newY, oldZ + j + 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX + a + 1, newY, oldZ + j + 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldX = oldX + (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldX = oldX + ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.WEST && dir == Direction.NORTH) {
@@ -484,28 +627,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX + j, newY, oldZ + a, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX + j, newY, oldZ + a, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX - a + j, newY, oldZ + j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX - a + j, newY, oldZ + j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX - a - 1, newY, oldZ - j - 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX - a - 1, newY, oldZ - j - 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldX = oldX - (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldX = oldX - ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         } else if (oldDir == Direction.WEST && dir == Direction.SOUTH) {
@@ -517,28 +660,28 @@ public class RoadEnabled {
             // browse all heights layers
             for (int i = 0; i < height; i++) {
 
-                int[] ids = part.getIds(i);
-                byte[] datas = part.getData(i);
+                String[] blockDataRow = part.getBlockDatas()[i];
+                
 
                 for (int j = 0; j <= jmax; j++) {
                     // forward shift
                     for (int a = 0; a <= j; a++) {
-                        putBlock(oldX - j, newY, oldZ + a, ids[jmax - j], datas[jmax - j], oldDir);
+                        putBlock(oldX - j, newY, oldZ + a, blockDataRow[jmax - j], oldDir);
                     }
                     // east shift
                     for (int a = 0; a <= jmax + j; a++) {
-                        putBlock(oldX + a - j, newY, oldZ + j, ids[jmax - j], datas[jmax - j], dir);
+                        putBlock(oldX + a - j, newY, oldZ + j, blockDataRow[jmax - j], dir);
                     }
                     // backward shift
                     for (int a = j; a < jmax; a++) {
-                        putBlock(oldX + a + 1, newY, oldZ - j - 1, ids[jmax + j + 1], datas[jmax + j + 1], dir);
+                        putBlock(oldX + a + 1, newY, oldZ - j - 1, blockDataRow[jmax + j + 1], dir);
                     }
                 }
                 newY++;
             }
 
-            oldX = oldX + (tunnel ? jmax - 1 : jmax);
-            oldDir = dir;
+            oldX = oldX + ((tunnel || bridge) ? jmax - 1 : jmax);
+            oldY = y; hasBuilt = true; count++; oldDir = dir;
             return true;
 
         }
@@ -546,6 +689,38 @@ public class RoadEnabled {
         return false;
     }
 
+
+    private void clearTunnel(int startX, int startY, int startZ, int width, int height, boolean isXAxis) {
+        int clearHeight = Math.max(4, height);
+        for (int h = 0; h <= clearHeight; h++) {
+            for (int w = -width/2; w <= width/2; w++) {
+                int px = startX;
+                int pz = startZ;
+                if (isXAxis) {
+                    pz += w;
+                } else {
+                    px += w;
+                }
+                Block b = world.getBlockAt(px, startY + h, pz);
+                if (!b.getType().isAir()) {
+                    undo.put(b);
+                    
+                    // Mimic block damage for anti-xray / Orebfuscator updates
+                    org.bukkit.event.block.BlockDamageEvent event = new org.bukkit.event.block.BlockDamageEvent(
+                        player, b, player.getInventory().getItemInMainHand(), true
+                    );
+                    org.bukkit.Bukkit.getPluginManager().callEvent(event);
+                    
+                    LazyMiner miner = plugin.getLazyMiner(player.getName());
+                    if (miner != null && miner.enabled() && player.hasPermission("lazyroad.lazyminer")) {
+                        miner.SaveBlock(b);
+                    }
+                    b.setType(org.bukkit.Material.AIR);
+                }
+            }
+        }
+    }
+    
     private void drawNorth(int x, int y, int z, boolean tunnel) {
         /**
          * DRAWING ROAD MAIN PART
@@ -558,7 +733,7 @@ public class RoadEnabled {
         int newY;
         int groundLayer = part.getGroundLayer();
         // new coords
-        int newX = tunnel ? x - 1 : x;
+        int newX = (tunnel || bridge) ? x - 1 : x;
         if (y - oldY > 0) {
             newY = y - part.getGroundLayer() - 1;
         } else {
@@ -568,22 +743,25 @@ public class RoadEnabled {
         // information about the array of informations
         int height = part.getHeight();
         int width = part.getWidth();
+        if (tunnel) {
+            clearTunnel(newX, newY, newZ, width, height, true);
+        }
 
-        int[][] ids = part.getIds();
-        byte[][] datas = part.getDatas();
 
+        String[][] blockDatas = part.getBlockDatas();
+
+        int offset = part.getPlayerOffset();
         for (int i = 0; i < height; i++) {
 
             // go to the left
-            newZ = z + (width / 2);
+            newZ = z + offset;
 
             for (int j = 0; j < width; j++) {
 
                 // the block to place
-                int id = ids[i][j];
-                byte data = datas[i][j];
+                String blockData = blockDatas[i][j];
 
-                putBlock(newX, newY, newZ, id, data, Direction.NORTH);
+                putBlock(newX, newY, newZ, blockData, Direction.NORTH);
 
                 newZ--;
             }
@@ -598,30 +776,30 @@ public class RoadEnabled {
 
             RoadPart stairs = road.getStairs();
 
-            newX = tunnel ? x - 1 : x;
-            newY = (y - oldY) > 0 ? y : y + 1;
+            newX = (tunnel || bridge) ? x - 1 : x;
+            newY = ((y - oldY) > 0 ? y : y + 1) - stairs.getGroundLayer();
             newZ = z;
 
             height = stairs.getHeight();
             width = stairs.getWidth();
 
-            ids = stairs.getIds();
-            datas = stairs.getDatas();
+            blockDatas = stairs.getBlockDatas();
+            
 
+            int stairOffset = stairs.getPlayerOffset();
             for (int i = 0; i < height; i++) {
 
                 // go to the left
-                newZ = z + (width / 2);
+                newZ = z + stairOffset;
 
                 for (int j = 0; j < width; j++) {
 
                     // the block to place
-                    int id = ids[i][j];
-                    byte data = datas[i][j];
+                    String blockData = blockDatas[i][j];
                     if (y - oldY > 0) {
-                        putBlock(newX, newY, newZ, id, data, Direction.NORTH);
+                        putBlock(newX, newY, newZ, blockData, Direction.SOUTH);
                     } else {
-                        putBlock(newX, newY, newZ, id, data, Direction.SOUTH);
+                        putBlock(newX, newY, newZ, blockData, Direction.NORTH);
                     }
 
                     newZ--;
@@ -637,62 +815,10 @@ public class RoadEnabled {
          * DRAWING PILLARS
          */
         if (pillar != null) {
-
             PillarPart pillarPart = pillar.getRoadPartToBuild(count);
-
-            if (pillarPart == null) {
-                System.out.println("pillar is null");
-                return;
+            if (pillarPart != null) {
+                drawPillar(pillarPart, x, z, y - groundLayer - 1, Direction.NORTH, tunnel, bridge);
             }
-
-            newX = tunnel ? x - 1 : x;
-            newY = y - groundLayer - 1;
-            newZ = z;
-
-            int buildUntil = pillarPart.getBuildUntil();
-            if (buildUntil == 0) {
-                buildUntil = Integer.MAX_VALUE;
-            }
-
-            height = pillarPart.getHeight();
-            width = pillarPart.getWidth();
-
-            ids = pillarPart.getIds();
-            datas = pillarPart.getDatas();
-
-
-            // build the pillar
-            int i = 0;
-            boolean buildBlock = false;
-            do {
-                // go to the left
-                newZ = z + (width / 2);
-                int h = i >= height ? height - 1 : i;
-                buildBlock = false;
-
-                for (int j = 0; j < width; j++) {
-                    // getting the block information
-                    int id = ids[h][j];
-                    byte data = datas[h][j];
-
-                    if (id != -1) {
-                        Block block = world.getBlockAt(newX, newY, newZ);
-                        if (isToIgnoreForPillar(block)) {
-                            if (id != 0 || block.getTypeId() != 0) {
-                                undo.putBlock(block);
-                                block.setTypeIdAndData(id, data, false);
-                                buildBlock = true;
-                            }
-                        }
-                    }
-
-                    //to right
-                    newZ--;
-                }
-                buildUntil--;
-                newY--;
-                i++;
-            } while ((buildBlock || i < height) && buildUntil > 0 && newY > 0);
         }
     }
 
@@ -708,7 +834,7 @@ public class RoadEnabled {
 
         int groundLayer = part.getGroundLayer();
         // new coords
-        int newX = tunnel ? x + 1 : x;
+        int newX = (tunnel || bridge) ? x + 1 : x;
         int newY;
         if (y - oldY > 0) {
             newY = y - part.getGroundLayer() - 1;
@@ -719,22 +845,25 @@ public class RoadEnabled {
         // information about the array of informations
         int height = part.getHeight();
         int width = part.getWidth();
+        if (tunnel) {
+            clearTunnel(newX, newY, newZ, width, height, true);
+        }
 
-        int[][] ids = part.getIds();
-        byte[][] datas = part.getDatas();
 
+        String[][] blockDatas = part.getBlockDatas();
+
+        int offset = part.getPlayerOffset();
         for (int i = 0; i < height; i++) {
 
             // go to the left
-            newZ = z - (width / 2);
+            newZ = z - offset;
 
             for (int j = 0; j < width; j++) {
 
                 // the block to place
-                int id = ids[i][j];
-                byte data = datas[i][j];
+                String blockData = blockDatas[i][j];
 
-                putBlock(newX, newY, newZ, id, data, Direction.SOUTH);
+                putBlock(newX, newY, newZ, blockData, Direction.SOUTH);
 
                 newZ++;
             }
@@ -749,31 +878,31 @@ public class RoadEnabled {
 
             RoadPart stairs = road.getStairs();
 
-            newX = tunnel ? x + 1 : x;
-            newY = (y - oldY) > 0 ? y : y + 1;
+            newX = (tunnel || bridge) ? x + 1 : x;
+            newY = ((y - oldY) > 0 ? y : y + 1) - stairs.getGroundLayer();
             newZ = z;
 
             height = stairs.getHeight();
             width = stairs.getWidth();
 
-            ids = stairs.getIds();
-            datas = stairs.getDatas();
+            blockDatas = stairs.getBlockDatas();
+            
 
+            int stairOffset = stairs.getPlayerOffset();
             for (int i = 0; i < height; i++) {
 
                 // go to the left
-                newZ = z - (width / 2);
+                newZ = z - stairOffset;
 
                 for (int j = 0; j < width; j++) {
 
                     // the block to place
-                    int id = ids[i][j];
-                    byte data = datas[i][j];
+                    String blockData = blockDatas[i][j];
 
                     if (y - oldY > 0) {
-                        putBlock(newX, newY, newZ, id, data, Direction.SOUTH);
+                        putBlock(newX, newY, newZ, blockData, Direction.NORTH);
                     } else {
-                        putBlock(newX, newY, newZ, id, data, Direction.NORTH);
+                        putBlock(newX, newY, newZ, blockData, Direction.SOUTH);
                     }
 
                     newZ++;
@@ -789,63 +918,10 @@ public class RoadEnabled {
          * DRAWING PILLARS
          */
         if (pillar != null) {
-
             PillarPart pillarPart = pillar.getRoadPartToBuild(count);
-
-            if (pillarPart == null) {
-                return;
+            if (pillarPart != null) {
+                drawPillar(pillarPart, x, z, y - groundLayer - 1, Direction.SOUTH, tunnel, bridge);
             }
-
-            newX = tunnel ? x + 1 : x;
-            newY = y - groundLayer - 1;
-            newZ = z;
-
-            int buildUntil = pillarPart.getBuildUntil();
-            if (buildUntil == 0) {
-                buildUntil = Integer.MAX_VALUE;
-            }
-
-            height = pillarPart.getHeight();
-            width = pillarPart.getWidth();
-
-            ids = pillarPart.getIds();
-            datas = pillarPart.getDatas();
-
-
-            // build the pillar
-            int i = 0;
-            boolean buildBlock = false;
-            do {
-                // go to the left
-                newZ = z - (width / 2);
-
-                int h = i >= height ? height - 1 : i;
-
-                buildBlock = false;
-
-                for (int j = 0; j < width; j++) {
-                    // getting the block information
-                    int id = ids[h][j];
-                    byte data = datas[h][j];
-
-                    if (id != -1) {
-                        Block block = world.getBlockAt(newX, newY, newZ);
-                        if (isToIgnoreForPillar(block)) {
-                            if (id != 0 || block.getTypeId() != 0) {
-                                undo.putBlock(block);
-                                block.setTypeIdAndData(id, data, false);
-                                buildBlock = true;
-                            }
-                        }
-                    }
-
-                    //to right
-                    newZ++;
-                }
-                buildUntil--;
-                newY--;
-                i++;
-            } while ((buildBlock || i < height) && buildUntil > 0 && newY > 0);
         }
     }
 
@@ -868,26 +944,29 @@ public class RoadEnabled {
         } else {
             newY = y - part.getGroundLayer();
         }
-        int newZ = tunnel ? z + 1 : z;
+        int newZ = (tunnel || bridge) ? z + 1 : z;
         // information about the array of informations
         int height = part.getHeight();
         int width = part.getWidth();
+        if (tunnel) {
+            clearTunnel(newX, newY, newZ, width, height, false);
+        }
 
-        int[][] ids = part.getIds();
-        byte[][] datas = part.getDatas();
 
+        String[][] blockDatas = part.getBlockDatas();
+
+        int offset = part.getPlayerOffset();
         for (int i = 0; i < height; i++) {
 
             // go to the left
-            newX = x + (width / 2);
+            newX = x + offset;
 
             for (int j = 0; j < width; j++) {
 
                 // the block to place
-                int id = ids[i][j];
-                byte data = datas[i][j];
+                String blockData = blockDatas[i][j];
 
-                putBlock(newX, newY, newZ, id, data, Direction.WEST);
+                putBlock(newX, newY, newZ, blockData, Direction.WEST);
 
                 newX--;
             }
@@ -903,30 +982,30 @@ public class RoadEnabled {
             RoadPart stairs = road.getStairs();
 
             newX = x;
-            newY = (y - oldY) > 0 ? y : y + 1;
-            newZ = tunnel ? z + 1 : z;
+            newY = ((y - oldY) > 0 ? y : y + 1) - stairs.getGroundLayer();
+            newZ = (tunnel || bridge) ? z + 1 : z;
 
             height = stairs.getHeight();
             width = stairs.getWidth();
 
-            ids = stairs.getIds();
-            datas = stairs.getDatas();
+            blockDatas = stairs.getBlockDatas();
+            
 
+            int stairOffset = stairs.getPlayerOffset();
             for (int i = 0; i < height; i++) {
 
                 // go to the left
-                newX = x + (width / 2);
+                newX = x + stairOffset;
 
                 for (int j = 0; j < width; j++) {
 
                     // the block to place
-                    int id = ids[i][j];
-                    byte data = datas[i][j];
+                    String blockData = blockDatas[i][j];
 
                     if (y - oldY > 0) {
-                        putBlock(newX, newY, newZ, id, data, Direction.WEST);
+                        putBlock(newX, newY, newZ, blockData, Direction.EAST);
                     } else {
-                        putBlock(newX, newY, newZ, id, data, Direction.EAST);
+                        putBlock(newX, newY, newZ, blockData, Direction.WEST);
                     }
 
                     newX--;
@@ -942,61 +1021,10 @@ public class RoadEnabled {
          * DRAWING PILLARS
          */
         if (pillar != null) {
-
             PillarPart pillarPart = pillar.getRoadPartToBuild(count);
-
-            if (pillarPart == null) {
-                return;
+            if (pillarPart != null) {
+                drawPillar(pillarPart, x, z, y - groundLayer - 1, Direction.WEST, tunnel, bridge);
             }
-
-            newX = x;
-            newY = y - groundLayer - 1;
-            newZ = tunnel ? z + 1 : z;
-
-            int buildUntil = pillarPart.getBuildUntil();
-            if (buildUntil == 0) {
-                buildUntil = Integer.MAX_VALUE;
-            }
-
-            height = pillarPart.getHeight();
-            width = pillarPart.getWidth();
-
-            ids = pillarPart.getIds();
-            datas = pillarPart.getDatas();
-
-
-            // build the pillar
-            int i = 0;
-            boolean buildBlock = false;
-            do {
-                // go to the left
-                newX = x + (width / 2);
-                int h = i >= height ? height - 1 : i;
-                buildBlock = false;
-
-                for (int j = 0; j < width; j++) {
-                    // getting the block information
-                    int id = ids[h][j];
-                    byte data = datas[h][j];
-
-                    if (id != -1) {
-                        Block block = world.getBlockAt(newX, newY, newZ);
-                        if (isToIgnoreForPillar(block)) {
-                            if (id != 0 || block.getTypeId() != 0) {
-                                undo.putBlock(block);
-                                block.setTypeIdAndData(id, data, false);
-                                buildBlock = true;
-                            }
-                        }
-                    }
-
-                    //to right
-                    newX--;
-                }
-                buildUntil--;
-                newY--;
-                i++;
-            } while ((buildBlock || i < height) && buildUntil > 0 && newY > 0);
         }
     }
 
@@ -1019,26 +1047,29 @@ public class RoadEnabled {
         } else {
             newY = y - part.getGroundLayer();
         }
-        int newZ = tunnel ? z - 1 : z;
+        int newZ = (tunnel || bridge) ? z - 1 : z;
         // information about the array of informations
         int height = part.getHeight();
         int width = part.getWidth();
+        if (tunnel) {
+            clearTunnel(newX, newY, newZ, width, height, false);
+        }
 
-        int[][] ids = part.getIds();
-        byte[][] datas = part.getDatas();
 
+        String[][] blockDatas = part.getBlockDatas();
+
+        int offset = part.getPlayerOffset();
         for (int i = 0; i < height; i++) {
 
             // go to the left
-            newX = x - (width / 2);
+            newX = x - offset;
 
             for (int j = 0; j < width; j++) {
 
                 // the block to place
-                int id = ids[i][j];
-                byte data = datas[i][j];
+                String blockData = blockDatas[i][j];
 
-                putBlock(newX, newY, newZ, id, data, Direction.EAST);
+                putBlock(newX, newY, newZ, blockData, Direction.EAST);
 
                 newX++;
             }
@@ -1054,30 +1085,30 @@ public class RoadEnabled {
             RoadPart stairs = road.getStairs();
 
             newX = x;
-            newY = (y - oldY) > 0 ? y : y + 1;
-            newZ = tunnel ? z - 1 : z;
+            newY = ((y - oldY) > 0 ? y : y + 1) - stairs.getGroundLayer();
+            newZ = (tunnel || bridge) ? z - 1 : z;
 
             height = stairs.getHeight();
             width = stairs.getWidth();
 
-            ids = stairs.getIds();
-            datas = stairs.getDatas();
+            blockDatas = stairs.getBlockDatas();
+            
 
+            int stairOffset = stairs.getPlayerOffset();
             for (int i = 0; i < height; i++) {
 
                 // go to the left
-                newX = x - (width / 2);
+                newX = x - stairOffset;
 
                 for (int j = 0; j < width; j++) {
 
                     // the block to place
-                    int id = ids[i][j];
-                    byte data = datas[i][j];
+                    String blockData = blockDatas[i][j];
 
                     if (y - oldY > 0) {
-                        putBlock(newX, newY, newZ, id, data, Direction.EAST);
+                        putBlock(newX, newY, newZ, blockData, Direction.WEST);
                     } else {
-                        putBlock(newX, newY, newZ, id, data, Direction.WEST);
+                        putBlock(newX, newY, newZ, blockData, Direction.EAST);
                     }
 
                     newX++;
@@ -1093,61 +1124,10 @@ public class RoadEnabled {
          * DRAWING PILLARS
          */
         if (pillar != null) {
-
             PillarPart pillarPart = pillar.getRoadPartToBuild(count);
-
-            if (pillarPart == null) {
-                return;
+            if (pillarPart != null) {
+                drawPillar(pillarPart, x, z, y - groundLayer - 1, Direction.EAST, tunnel, bridge);
             }
-
-            newX = x;
-            newY = y - groundLayer - 1;
-            newZ = tunnel ? z - 1 : z;
-
-            int buildUntil = pillarPart.getBuildUntil();
-            if (buildUntil == 0) {
-                buildUntil = Integer.MAX_VALUE;
-            }
-
-            height = pillarPart.getHeight();
-            width = pillarPart.getWidth();
-
-            ids = pillarPart.getIds();
-            datas = pillarPart.getDatas();
-
-
-            // build the pillar
-            int i = 0;
-            boolean buildBlock = false;
-            do {
-                // go to the left
-                newX = x - (width / 2);
-                int h = i >= height ? height - 1 : i;
-                buildBlock = false;
-
-                for (int j = 0; j < width; j++) {
-                    // getting the block information
-                    int id = ids[h][j];
-                    byte data = datas[h][j];
-
-                    if (id != -1) {
-                        Block block = world.getBlockAt(newX, newY, newZ);
-                        if (isToIgnoreForPillar(block)) {
-                            if (id != 0 || block.getTypeId() != 0) {
-                                undo.putBlock(block);
-                                block.setTypeIdAndData(id, data, false);
-                                buildBlock = true;
-                            }
-                        }
-                    }
-
-                    //to right
-                    newX++;
-                }
-                buildUntil--;
-                newY--;
-                i++;
-            } while ((buildBlock || i < height) && buildUntil > 0 && newY > 0);
         }
     }
 
@@ -1161,6 +1141,14 @@ public class RoadEnabled {
 
     public Road getRoad() {
         return road;
+    }
+
+    public boolean isBridge() {
+        return bridge;
+    }
+
+    public void setBridge(boolean bridge) {
+        this.bridge = bridge;
     }
 
     public boolean isTunnel() {
@@ -1180,44 +1168,13 @@ public class RoadEnabled {
     }
 
     private boolean isToIgnore(Block b) {
-        int i = b.getTypeId();
-
-        return i == 0
-                || i == 6
-                || (i >= 8 && i <= 11)
-                || (i >= 30 && i <= 32)
-                || (i >= 37 && i <= 40)
-                || i == 50
-                || i == 51
-                || i == 55
-                || i == 59
-                || i == 70
-                || i == 72
-                || (i >= 75 && i <= 78)
-                || i == 106
-                || i == 111
-                || i == 115;
+        Material type = b.getType();
+        return !type.isSolid() && type != Material.WATER && type != Material.LAVA;
     }
 
     private boolean isToIgnoreForPillar(Block b) {
-        int i = b.getTypeId();
-
-        return i == 0
-                || i == 6
-                || (i >= 8 && i <= 11)
-                || (i >= 17 && i <= 18)
-                || (i >= 30 && i <= 32)
-                || (i >= 37 && i <= 40)
-                || i == 50
-                || i == 51
-                || i == 59
-                || i == 70
-                || i == 72
-                || i == 78
-                || i == 79
-                || i == 106
-                || i == 111
-                || i == 115;
+        Material type = b.getType();
+        return !type.isSolid() || type.name().contains("LOG") || type.name().contains("LEAVES");
     }
 
     public boolean isHasBuilt() {
@@ -1248,3 +1205,12 @@ public class RoadEnabled {
         return world;
     }
 }
+
+
+
+
+
+
+
+
+

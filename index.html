@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LazyRoad Designer</title>
+<link rel="icon" type="image/png" href="designer/lazyroad.png">
+<style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; margin: 0; background: #282a36; color: #f8f8f2; overflow: hidden; }
+    .sidebar { width: 320px; background: #44475a; padding: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; text-align: left; box-sizing: border-box; }
+    .main { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; text-align: left; background: #282a36; box-sizing: border-box; height: 100vh; min-width: 0; overflow: hidden; }
+    .canvas-container {
+        flex-grow: 1;
+        overflow: auto;
+        margin-top: 10px;
+        background: #1e1f29;
+        border: 2px solid #44475a;
+        border-radius: 6px;
+        padding: 15px;
+        min-height: 200px;
+        box-sizing: border-box;
+        text-align: center;
+    }
+    .canvas-container::-webkit-scrollbar, .sidebar::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    .canvas-container::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track {
+        background: #282a36;
+        border-radius: 4px;
+    }
+    .canvas-container::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb {
+        background: #6272a4;
+        border-radius: 4px;
+    }
+    .canvas-container::-webkit-scrollbar-thumb:hover, .sidebar::-webkit-scrollbar-thumb:hover {
+        background: #50fa7b;
+    }
+    canvas { background: #6272a4; border: 2px solid #50fa7b; cursor: crosshair; image-rendering: pixelated; display: inline-block; vertical-align: top; border-radius: 4px; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: #44475a; padding: 10px; border-radius: 5px; }
+    input, select, button, textarea { background: #282a36; color: #f8f8f2; border: 1px solid #6272a4; padding: 5px 8px; border-radius: 4px; }
+    button { background: #50fa7b; color: #282a36; font-weight: bold; cursor: pointer; border: none; }
+    button:hover { background: #40c963; }
+    button.save { background: #bd93f9; color: #fff; }
+    button.save:hover { background: #a272eb; }
+    button.danger { background: #ff5555; color: #fff; }
+    button.danger:hover { background: #e33e3e; }
+    .tabs { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+    .tab { padding: 5px 10px; background: #6272a4; border-radius: 3px; cursor: pointer; }
+    .tab.active { background: #50fa7b; color: #282a36; font-weight: bold; }
+    .recent-blocks { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .recent-block { padding: 3px 6px; background: #6272a4; font-size: 12px; border-radius: 3px; cursor: pointer; }
+    h2, h3, h4 { margin: 5px 0; }
+    .form-row { display: flex; justify-content: space-between; align-items: center; }
+    .form-row label { flex: 1; margin-right: 10px;font-size: 14px; }
+    .form-row input { flex: 1; max-width: 100px; }
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
+.modal-content { background-color: #282a36; margin: 10% auto; padding: 20px; border: 1px solid #6272a4; width: 80%; max-width: 500px; color: #f8f8f2; border-radius: 5px; }
+.close-modal { color: #ff5555; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.close-modal:hover { color: #ffb86c; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>LazyRoad Designer</h2>
+    
+    <div class="form-row">
+        <label>Type:</label>
+        <select id="templateType" onchange="updateDesignMode()">
+            <option value="road">Road</option>
+            <option value="pillar">Pillar</option>
+        </select>
+    </div>
+    
+    <div class="form-row" style="margin-top:10px;">
+        <label>Active Material:</label>
+    </div>
+    <div style="display:flex; gap:5px;">
+        <input type="text" id="activeMaterial" value="" placeholder="e.g. stone" style="flex:1;" list="blockDataList">        <datalist id="blockDataList"></datalist>
+        <button onclick="document.getElementById('activeMaterial').value = '';" style="background:#ff5555; color:#282a36; flex:none;">Clear</button>
+    </div>
+    
+        <div style="font-size: 12px;">Direction (Click appends to material):</div>
+    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+        <button onclick="appendDirection('north')">N (Fwd)</button>
+        <button onclick="appendDirection('south')">S (Back)</button>
+        <button onclick="appendDirection('east')">E (Right)</button>
+        <button onclick="appendDirection('west')">W (Left)</button>
+    </div>
+    <div style="font-size: 12px; margin-top:5px;">Block States (Click appends):</div>
+    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+        <button onclick="appendState('hanging=true')" style="background:#ffb86c; color:#282a36;">Hanging</button>
+        <button onclick="appendStateSmart('top')" style="background:#ffb86c; color:#282a36;">Top Half (Upside)</button>
+        <button onclick="appendStateSmart('bottom')" style="background:#ffb86c; color:#282a36;">Bottom Half</button>
+    </div>
+
+    <h4>Recent Blocks</h4>
+    <div class="recent-blocks" id="recentBlocksList"></div>
+    
+    <hr style="width:100%; border-color:#6272a4; margin:10px 0;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button onclick="document.getElementById('globalSettingsModal').style.display = 'block';" style="background:#6272a4;">⚙️ Global Settings</button>
+        <button onclick="document.getElementById('ioModal').style.display = 'block';" style="background:#8be9fd; color:#282a36;">💾 Import / Export JSON</button>
+    </div>
+    
+    <!-- Modals (Hidden by Default) -->
+    <div id="globalSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="document.getElementById('globalSettingsModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0;">Global Settings</h3>
+            <div class="form-row"><label>Max Gradient:</label> <input type="number" id="globalMaxGradient" value="2"></div>
+            <div class="form-row"><label title="Total length / repeat cycle of the template sequence.">Max Sequence:</label> <input type="number" id="globalMaxSequence" value="10" min="1" style="width:60px;" title="Total steps in the sequence cycle"></div>
+            <div class="form-row"><label>Stair Min Blocks:</label> <input type="number" id="globalStairMinBlocks" value="0"></div>
+        </div>
+    </div>
+    
+    <div id="ioModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="document.getElementById('ioModal').style.display='none'">&times;</span>
+            <h3 style="margin-top:0;">Import / Export</h3>
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileUpload(event)">
+                <button onclick="document.getElementById('ioModal').style.display='none'; triggerLoad('auto');" style="flex:1; background:#8be9fd; color:#282a36; font-weight: bold;">Load Template</button>
+            </div>
+            <div style="display: flex; gap: 5px; margin-top: 5px;">
+                <button class="save" id="exportBtn" style="flex:1;">Generate JSON</button>
+            </div>
+            <textarea id="jsonOutput" rows="12" placeholder="Paste JSON here to load manually..." style="margin-top:15px; width:100%; background:#282a36; color:#f8f8f2; border:1px solid #6272a4;"></textarea>
+            <button onclick="document.getElementById('ioModal').style.display='none'; handleManualLoad();" style="width:100%; margin-top:5px; font-size:11px; background:#6272a4;">Load from Textbox</button>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="toolbar">
+        <button id="addPartBtn">Add Road Part</button>
+        <button id="editStairsBtn" style="background:#ffb86c; color:#282a36;">Show Stairs</button>
+    </div>
+    <div class="tabs" id="partsTabs"></div>
+    
+    <div class="toolbar" style="margin-top:15px;" id="partToolbar">
+        <div class="form-row" style="margin-right:15px;">
+            <label title="The horizontal width span of this block grid segment.">Width:</label> <input type="number" id="partWidth" value="5" min="1" onchange="updatePartDimensions()">
+        </div>
+        <div class="form-row" style="margin-right:15px;">
+            <label title="The vertical core height of this segment (excluding pillar bases if applicable).">Height:</label> <input type="number" id="partHeight" value="6" min="1" onchange="updatePartDimensions()">
+        </div>
+        <div class="form-row" style="margin-right:15px;">
+            <label id="groundLayerLabel" title="For Pillars: The number of vertical blocks carved out from the bottom to form the non-repeating foundation base. For Roads: The Y-index of the block the player visually walks on.">Ground Index:</label> <input type="number" id="partGroundLayer" value="0" min="0" onchange="savePartProperties()">
+        </div>
+        <div class="form-row" style="margin-right:15px;" id="playerOffsetDiv">
+            <label id="playerOffsetLabel" title="Horizontal grid column (0-indexed from left) where the player stands and builds from. Default is width / 2. Useful for even widths or asymmetrical roads.">Player Pos:</label> <input type="number" id="partPlayerOffset" value="" min="0" style="width:45px;" placeholder="Auto" onchange="savePartProperties()">
+        </div>
+        <div class="form-row" style="margin-right:15px;" id="buildUntilDiv">
+            <label id="buildUntilLabel" style="color: #ff79c6;" title="Limits how many blocks down this specific pillar part will generate before halting. Perfect for shaping sweeping arches! Select 0 to build down continuously until hitting solid ground (does not go infinitely).">Build Max Lim:</label> <input type="number" id="partBuildUntil" value="0" min="0" style="width:40px;" onchange="savePartProperties()">
+        </div>
+        <div class="form-row" style="margin-right:15px;">
+            <select id="partTriggerMode" onchange="toggleTriggerMode(this.value)" style="background:#44475a; color:#f8f8f2; border:1px solid #6272a4; padding:3px 6px; border-radius:4px; font-size:12px; cursor:pointer;">
+                <option value="repeat">Repeat Every</option>
+                <option value="position">Trigger At Step</option>
+            </select>
+            <input type="number" id="partRepeatEvery" value="1" min="1" style="width:50px; margin-left:5px;" onchange="savePartProperties()">
+            <input type="text" id="partTriggerPositions" value="" placeholder="e.g. 5, 7" style="display:none; width:75px; margin-left:5px;" title="Comma-separated 1-indexed steps in sequence (e.g. 5, 6, 7)" onchange="savePartProperties()">
+        </div>
+        <div class="form-row" style="margin-right:15px;" id="startHereDiv">
+            <label id="startHereLabel" style="color: #f1fa8c; cursor:pointer;" title="Designates this part or pillar as the sequence start point (Frame 0). When checked, all other parts are automatically unchecked.">
+                <input type="checkbox" id="partStartHere" onchange="toggleStartHere(this.checked)" style="cursor:pointer; vertical-align:middle; margin-right:4px;">Start Here
+            </label>
+        </div>
+        <button class="danger" id="deletePartBtn">Delete Part</button>
+    </div>
+
+    <div class="canvas-container" id="canvasContainer">
+        <canvas id="editorCanvas" width="800" height="500"></canvas>
+    </div>
+    <p style="color:#8be9fd; font-size:12px;">Left Click: Place block | Right Click: Remove block<br>Note: Y=0 is at the bottom of the grid.</p>
+</div>
+
+<script>
+    const MINECRAFT_BLOCKS = ["air","stone","granite","polished_granite","diorite","polished_diorite","andesite","polished_andesite","grass_block","dirt","coarse_dirt","podzol","cobblestone","oak_planks","spruce_planks","birch_planks","jungle_planks","acacia_planks","cherry_planks","dark_oak_planks","mangrove_planks","bamboo_planks","bamboo_mosaic","oak_sapling","spruce_sapling","birch_sapling","jungle_sapling","acacia_sapling","cherry_sapling","dark_oak_sapling","mangrove_propagule","bedrock","water","lava","sand","suspicious_sand","red_sand","gravel","suspicious_gravel","gold_ore","deepslate_gold_ore","iron_ore","deepslate_iron_ore","coal_ore","deepslate_coal_ore","nether_gold_ore","oak_log","spruce_log","birch_log","jungle_log","acacia_log","cherry_log","dark_oak_log","mangrove_log","mangrove_roots","muddy_mangrove_roots","bamboo_block","stripped_spruce_log","stripped_birch_log","stripped_jungle_log","stripped_acacia_log","stripped_cherry_log","stripped_dark_oak_log","stripped_oak_log","stripped_mangrove_log","stripped_bamboo_block","oak_wood","spruce_wood","birch_wood","jungle_wood","acacia_wood","cherry_wood","dark_oak_wood","mangrove_wood","stripped_oak_wood","stripped_spruce_wood","stripped_birch_wood","stripped_jungle_wood","stripped_acacia_wood","stripped_cherry_wood","stripped_dark_oak_wood","stripped_mangrove_wood","oak_leaves","spruce_leaves","birch_leaves","jungle_leaves","acacia_leaves","cherry_leaves","dark_oak_leaves","mangrove_leaves","azalea_leaves","flowering_azalea_leaves","sponge","wet_sponge","glass","lapis_ore","deepslate_lapis_ore","lapis_block","dispenser","sandstone","chiseled_sandstone","cut_sandstone","note_block","white_bed","orange_bed","magenta_bed","light_blue_bed","yellow_bed","lime_bed","pink_bed","gray_bed","light_gray_bed","cyan_bed","purple_bed","blue_bed","brown_bed","green_bed","red_bed","black_bed","powered_rail","detector_rail","sticky_piston","cobweb","grass","fern","dead_bush","seagrass","tall_seagrass","piston","piston_head","white_wool","orange_wool","magenta_wool","light_blue_wool","yellow_wool","lime_wool","pink_wool","gray_wool","light_gray_wool","cyan_wool","purple_wool","blue_wool","brown_wool","green_wool","red_wool","black_wool","moving_piston","dandelion","torchflower","poppy","blue_orchid","allium","azure_bluet","red_tulip","orange_tulip","white_tulip","pink_tulip","oxeye_daisy","cornflower","wither_rose","lily_of_the_valley","brown_mushroom","red_mushroom","gold_block","iron_block","bricks","tnt","bookshelf","chiseled_bookshelf","mossy_cobblestone","obsidian","torch","wall_torch","fire","soul_fire","spawner","oak_stairs","chest","redstone_wire","diamond_ore","deepslate_diamond_ore","diamond_block","crafting_table","wheat","farmland","furnace","oak_sign","spruce_sign","birch_sign","acacia_sign","cherry_sign","jungle_sign","dark_oak_sign","mangrove_sign","bamboo_sign","oak_door","ladder","rail","cobblestone_stairs","oak_wall_sign","spruce_wall_sign","birch_wall_sign","acacia_wall_sign","cherry_wall_sign","jungle_wall_sign","dark_oak_wall_sign","mangrove_wall_sign","bamboo_wall_sign","oak_hanging_sign","spruce_hanging_sign","birch_hanging_sign","acacia_hanging_sign","cherry_hanging_sign","jungle_hanging_sign","dark_oak_hanging_sign","crimson_hanging_sign","warped_hanging_sign","mangrove_hanging_sign","bamboo_hanging_sign","oak_wall_hanging_sign","spruce_wall_hanging_sign","birch_wall_hanging_sign","acacia_wall_hanging_sign","cherry_wall_hanging_sign","jungle_wall_hanging_sign","dark_oak_wall_hanging_sign","mangrove_wall_hanging_sign","crimson_wall_hanging_sign","warped_wall_hanging_sign","bamboo_wall_hanging_sign","lever","stone_pressure_plate","iron_door","oak_pressure_plate","spruce_pressure_plate","birch_pressure_plate","jungle_pressure_plate","acacia_pressure_plate","cherry_pressure_plate","dark_oak_pressure_plate","mangrove_pressure_plate","bamboo_pressure_plate","redstone_ore","deepslate_redstone_ore","redstone_torch","redstone_wall_torch","stone_button","snow","ice","snow_block","cactus","clay","sugar_cane","jukebox","oak_fence","pumpkin","netherrack","soul_sand","soul_soil","basalt","polished_basalt","soul_torch","soul_wall_torch","glowstone","nether_portal","carved_pumpkin","jack_o_lantern","cake","repeater","white_stained_glass","orange_stained_glass","magenta_stained_glass","light_blue_stained_glass","yellow_stained_glass","lime_stained_glass","pink_stained_glass","gray_stained_glass","light_gray_stained_glass","cyan_stained_glass","purple_stained_glass","blue_stained_glass","brown_stained_glass","green_stained_glass","red_stained_glass","black_stained_glass","oak_trapdoor","spruce_trapdoor","birch_trapdoor","jungle_trapdoor","acacia_trapdoor","cherry_trapdoor","dark_oak_trapdoor","mangrove_trapdoor","bamboo_trapdoor","stone_bricks","mossy_stone_bricks","cracked_stone_bricks","chiseled_stone_bricks","packed_mud","mud_bricks","infested_stone","infested_cobblestone","infested_stone_bricks","infested_mossy_stone_bricks","infested_cracked_stone_bricks","infested_chiseled_stone_bricks","brown_mushroom_block","red_mushroom_block","mushroom_stem","iron_bars","chain","glass_pane","melon","attached_pumpkin_stem","attached_melon_stem","pumpkin_stem","melon_stem","vine","glow_lichen","oak_fence_gate","brick_stairs","stone_brick_stairs","mud_brick_stairs","mycelium","lily_pad","nether_bricks","nether_brick_fence","nether_brick_stairs","nether_wart","enchanting_table","brewing_stand","cauldron","water_cauldron","lava_cauldron","powder_snow_cauldron","end_portal","end_portal_frame","end_stone","dragon_egg","redstone_lamp","cocoa","sandstone_stairs","emerald_ore","deepslate_emerald_ore","ender_chest","tripwire_hook","tripwire","emerald_block","spruce_stairs","birch_stairs","jungle_stairs","command_block","beacon","cobblestone_wall","mossy_cobblestone_wall","flower_pot","potted_torchflower","potted_oak_sapling","potted_spruce_sapling","potted_birch_sapling","potted_jungle_sapling","potted_acacia_sapling","potted_cherry_sapling","potted_dark_oak_sapling","potted_mangrove_propagule","potted_fern","potted_dandelion","potted_poppy","potted_blue_orchid","potted_allium","potted_azure_bluet","potted_red_tulip","potted_orange_tulip","potted_white_tulip","potted_pink_tulip","potted_oxeye_daisy","potted_cornflower","potted_lily_of_the_valley","potted_wither_rose","potted_red_mushroom","potted_brown_mushroom","potted_dead_bush","potted_cactus","carrots","potatoes","oak_button","spruce_button","birch_button","jungle_button","acacia_button","cherry_button","dark_oak_button","mangrove_button","bamboo_button","skeleton_skull","skeleton_wall_skull","wither_skeleton_skull","wither_skeleton_wall_skull","zombie_head","zombie_wall_head","player_head","player_wall_head","creeper_head","creeper_wall_head","dragon_head","dragon_wall_head","piglin_head","piglin_wall_head","anvil","chipped_anvil","damaged_anvil","trapped_chest","light_weighted_pressure_plate","heavy_weighted_pressure_plate","comparator","daylight_detector","redstone_block","nether_quartz_ore","hopper","quartz_block","chiseled_quartz_block","quartz_pillar","quartz_stairs","activator_rail","dropper","white_terracotta","orange_terracotta","magenta_terracotta","light_blue_terracotta","yellow_terracotta","lime_terracotta","pink_terracotta","gray_terracotta","light_gray_terracotta","cyan_terracotta","purple_terracotta","blue_terracotta","brown_terracotta","green_terracotta","red_terracotta","black_terracotta","white_stained_glass_pane","orange_stained_glass_pane","magenta_stained_glass_pane","light_blue_stained_glass_pane","yellow_stained_glass_pane","lime_stained_glass_pane","pink_stained_glass_pane","gray_stained_glass_pane","light_gray_stained_glass_pane","cyan_stained_glass_pane","purple_stained_glass_pane","blue_stained_glass_pane","brown_stained_glass_pane","green_stained_glass_pane","red_stained_glass_pane","black_stained_glass_pane","acacia_stairs","cherry_stairs","dark_oak_stairs","mangrove_stairs","bamboo_stairs","bamboo_mosaic_stairs","slime_block","barrier","light","iron_trapdoor","prismarine","prismarine_bricks","dark_prismarine","prismarine_stairs","prismarine_brick_stairs","dark_prismarine_stairs","prismarine_slab","prismarine_brick_slab","dark_prismarine_slab","sea_lantern","hay_block","white_carpet","orange_carpet","magenta_carpet","light_blue_carpet","yellow_carpet","lime_carpet","pink_carpet","gray_carpet","light_gray_carpet","cyan_carpet","purple_carpet","blue_carpet","brown_carpet","green_carpet","red_carpet","black_carpet","terracotta","coal_block","packed_ice","sunflower","lilac","rose_bush","peony","tall_grass","large_fern","white_banner","orange_banner","magenta_banner","light_blue_banner","yellow_banner","lime_banner","pink_banner","gray_banner","light_gray_banner","cyan_banner","purple_banner","blue_banner","brown_banner","green_banner","red_banner","black_banner","white_wall_banner","orange_wall_banner","magenta_wall_banner","light_blue_wall_banner","yellow_wall_banner","lime_wall_banner","pink_wall_banner","gray_wall_banner","light_gray_wall_banner","cyan_wall_banner","purple_wall_banner","blue_wall_banner","brown_wall_banner","green_wall_banner","red_wall_banner","black_wall_banner","red_sandstone","chiseled_red_sandstone","cut_red_sandstone","red_sandstone_stairs","oak_slab","spruce_slab","birch_slab","jungle_slab","acacia_slab","cherry_slab","dark_oak_slab","mangrove_slab","bamboo_slab","bamboo_mosaic_slab","stone_slab","smooth_stone_slab","sandstone_slab","cut_sandstone_slab","petrified_oak_slab","cobblestone_slab","brick_slab","stone_brick_slab","mud_brick_slab","nether_brick_slab","quartz_slab","red_sandstone_slab","cut_red_sandstone_slab","purpur_slab","smooth_stone","smooth_sandstone","smooth_quartz","smooth_red_sandstone","spruce_fence_gate","birch_fence_gate","jungle_fence_gate","acacia_fence_gate","cherry_fence_gate","dark_oak_fence_gate","mangrove_fence_gate","bamboo_fence_gate","spruce_fence","birch_fence","jungle_fence","acacia_fence","cherry_fence","dark_oak_fence","mangrove_fence","bamboo_fence","spruce_door","birch_door","jungle_door","acacia_door","cherry_door","dark_oak_door","mangrove_door","bamboo_door","end_rod","chorus_plant","chorus_flower","purpur_block","purpur_pillar","purpur_stairs","end_stone_bricks","torchflower_crop","pitcher_crop","pitcher_plant","beetroots","dirt_path","end_gateway","repeating_command_block","chain_command_block","frosted_ice","magma_block","nether_wart_block","red_nether_bricks","bone_block","structure_void","observer","shulker_box","white_shulker_box","orange_shulker_box","magenta_shulker_box","light_blue_shulker_box","yellow_shulker_box","lime_shulker_box","pink_shulker_box","gray_shulker_box","light_gray_shulker_box","cyan_shulker_box","purple_shulker_box","blue_shulker_box","brown_shulker_box","green_shulker_box","red_shulker_box","black_shulker_box","white_glazed_terracotta","orange_glazed_terracotta","magenta_glazed_terracotta","light_blue_glazed_terracotta","yellow_glazed_terracotta","lime_glazed_terracotta","pink_glazed_terracotta","gray_glazed_terracotta","light_gray_glazed_terracotta","cyan_glazed_terracotta","purple_glazed_terracotta","blue_glazed_terracotta","brown_glazed_terracotta","green_glazed_terracotta","red_glazed_terracotta","black_glazed_terracotta","white_concrete","orange_concrete","magenta_concrete","light_blue_concrete","yellow_concrete","lime_concrete","pink_concrete","gray_concrete","light_gray_concrete","cyan_concrete","purple_concrete","blue_concrete","brown_concrete","green_concrete","red_concrete","black_concrete","white_concrete_powder","orange_concrete_powder","magenta_concrete_powder","light_blue_concrete_powder","yellow_concrete_powder","lime_concrete_powder","pink_concrete_powder","gray_concrete_powder","light_gray_concrete_powder","cyan_concrete_powder","purple_concrete_powder","blue_concrete_powder","brown_concrete_powder","green_concrete_powder","red_concrete_powder","black_concrete_powder","kelp","kelp_plant","dried_kelp_block","turtle_egg","sniffer_egg","dead_tube_coral_block","dead_brain_coral_block","dead_bubble_coral_block","dead_fire_coral_block","dead_horn_coral_block","tube_coral_block","brain_coral_block","bubble_coral_block","fire_coral_block","horn_coral_block","dead_tube_coral","dead_brain_coral","dead_bubble_coral","dead_fire_coral","dead_horn_coral","tube_coral","brain_coral","bubble_coral","fire_coral","horn_coral","dead_tube_coral_fan","dead_brain_coral_fan","dead_bubble_coral_fan","dead_fire_coral_fan","dead_horn_coral_fan","tube_coral_fan","brain_coral_fan","bubble_coral_fan","fire_coral_fan","horn_coral_fan","dead_tube_coral_wall_fan","dead_brain_coral_wall_fan","dead_bubble_coral_wall_fan","dead_fire_coral_wall_fan","dead_horn_coral_wall_fan","tube_coral_wall_fan","brain_coral_wall_fan","bubble_coral_wall_fan","fire_coral_wall_fan","horn_coral_wall_fan","sea_pickle","blue_ice","conduit","bamboo_sapling","bamboo","potted_bamboo","void_air","cave_air","bubble_column","polished_granite_stairs","smooth_red_sandstone_stairs","mossy_stone_brick_stairs","polished_diorite_stairs","mossy_cobblestone_stairs","end_stone_brick_stairs","stone_stairs","smooth_sandstone_stairs","smooth_quartz_stairs","granite_stairs","andesite_stairs","red_nether_brick_stairs","polished_andesite_stairs","diorite_stairs","polished_granite_slab","smooth_red_sandstone_slab","mossy_stone_brick_slab","polished_diorite_slab","mossy_cobblestone_slab","end_stone_brick_slab","smooth_sandstone_slab","smooth_quartz_slab","granite_slab","andesite_slab","red_nether_brick_slab","polished_andesite_slab","diorite_slab","brick_wall","prismarine_wall","red_sandstone_wall","mossy_stone_brick_wall","granite_wall","stone_brick_wall","mud_brick_wall","nether_brick_wall","andesite_wall","red_nether_brick_wall","sandstone_wall","end_stone_brick_wall","diorite_wall","scaffolding","loom","barrel","smoker","blast_furnace","cartography_table","fletching_table","grindstone","lectern","smithing_table","stonecutter","bell","lantern","soul_lantern","campfire","soul_campfire","sweet_berry_bush","warped_stem","stripped_warped_stem","warped_hyphae","stripped_warped_hyphae","warped_nylium","warped_fungus","warped_wart_block","warped_roots","nether_sprouts","crimson_stem","stripped_crimson_stem","crimson_hyphae","stripped_crimson_hyphae","crimson_nylium","crimson_fungus","shroomlight","weeping_vines","weeping_vines_plant","twisting_vines","twisting_vines_plant","crimson_roots","crimson_planks","warped_planks","crimson_slab","warped_slab","crimson_pressure_plate","warped_pressure_plate","crimson_fence","warped_fence","crimson_trapdoor","warped_trapdoor","crimson_fence_gate","warped_fence_gate","crimson_stairs","warped_stairs","crimson_button","warped_button","crimson_door","warped_door","crimson_sign","warped_sign","crimson_wall_sign","warped_wall_sign","structure_block","jigsaw","composter","target","bee_nest","beehive","honey_block","honeycomb_block","netherite_block","ancient_debris","crying_obsidian","respawn_anchor","potted_crimson_fungus","potted_warped_fungus","potted_crimson_roots","potted_warped_roots","lodestone","blackstone","blackstone_stairs","blackstone_wall","blackstone_slab","polished_blackstone","polished_blackstone_bricks","cracked_polished_blackstone_bricks","chiseled_polished_blackstone","polished_blackstone_brick_slab","polished_blackstone_brick_stairs","polished_blackstone_brick_wall","gilded_blackstone","polished_blackstone_stairs","polished_blackstone_slab","polished_blackstone_pressure_plate","polished_blackstone_button","polished_blackstone_wall","chiseled_nether_bricks","cracked_nether_bricks","quartz_bricks","candle","white_candle","orange_candle","magenta_candle","light_blue_candle","yellow_candle","lime_candle","pink_candle","gray_candle","light_gray_candle","cyan_candle","purple_candle","blue_candle","brown_candle","green_candle","red_candle","black_candle","candle_cake","white_candle_cake","orange_candle_cake","magenta_candle_cake","light_blue_candle_cake","yellow_candle_cake","lime_candle_cake","pink_candle_cake","gray_candle_cake","light_gray_candle_cake","cyan_candle_cake","purple_candle_cake","blue_candle_cake","brown_candle_cake","green_candle_cake","red_candle_cake","black_candle_cake","amethyst_block","budding_amethyst","amethyst_cluster","large_amethyst_bud","medium_amethyst_bud","small_amethyst_bud","tuff","calcite","tinted_glass","powder_snow","sculk_sensor","calibrated_sculk_sensor","sculk","sculk_vein","sculk_catalyst","sculk_shrieker","oxidized_copper","weathered_copper","exposed_copper","copper_block","copper_ore","deepslate_copper_ore","oxidized_cut_copper","weathered_cut_copper","exposed_cut_copper","cut_copper","oxidized_cut_copper_stairs","weathered_cut_copper_stairs","exposed_cut_copper_stairs","cut_copper_stairs","oxidized_cut_copper_slab","weathered_cut_copper_slab","exposed_cut_copper_slab","cut_copper_slab","waxed_copper_block","waxed_weathered_copper","waxed_exposed_copper","waxed_oxidized_copper","waxed_oxidized_cut_copper","waxed_weathered_cut_copper","waxed_exposed_cut_copper","waxed_cut_copper","waxed_oxidized_cut_copper_stairs","waxed_weathered_cut_copper_stairs","waxed_exposed_cut_copper_stairs","waxed_cut_copper_stairs","waxed_oxidized_cut_copper_slab","waxed_weathered_cut_copper_slab","waxed_exposed_cut_copper_slab","waxed_cut_copper_slab","lightning_rod","pointed_dripstone","dripstone_block","cave_vines","cave_vines_plant","spore_blossom","azalea","flowering_azalea","moss_carpet","pink_petals","moss_block","big_dripleaf","big_dripleaf_stem","small_dripleaf","hanging_roots","rooted_dirt","mud","deepslate","cobbled_deepslate","cobbled_deepslate_stairs","cobbled_deepslate_slab","cobbled_deepslate_wall","polished_deepslate","polished_deepslate_stairs","polished_deepslate_slab","polished_deepslate_wall","deepslate_tiles","deepslate_tile_stairs","deepslate_tile_slab","deepslate_tile_wall","deepslate_bricks","deepslate_brick_stairs","deepslate_brick_slab","deepslate_brick_wall","chiseled_deepslate","cracked_deepslate_bricks","cracked_deepslate_tiles","infested_deepslate","smooth_basalt","raw_iron_block","raw_copper_block","raw_gold_block","potted_azalea_bush","potted_flowering_azalea_bush","ochre_froglight","verdant_froglight","pearlescent_froglight","frogspawn","reinforced_deepslate","decorated_pot"];
+    
+    // Populate the autocomplete datalist
+    window.addEventListener('DOMContentLoaded', () => {
+        const dataList = document.getElementById('blockDataList');
+        if (dataList) {
+            MINECRAFT_BLOCKS.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b;
+                dataList.appendChild(opt);
+            });
+        }
+    });
+    function getBlockColors(material) {
+        const mat = material.toLowerCase();
+                let bg = '#f1fa8c'; // default yellow
+        
+        // Light Sources (Highest Priority)
+        if (mat.includes('redstone') && mat.includes('torch')) bg = '#ff3333';
+        else if (mat.includes('torch') || mat.includes('glowstone') || mat.includes('lantern') || mat.includes('lamp') || mat.includes('sea_lantern')) bg = '#ffea00';
+        
+        // Wood / Dirt / Vegetation
+        else if (mat.includes('dirt') || mat.includes('wood') || mat.includes('brown')) bg = '#6e4a2d';
+        else if (mat.includes('dark oak') || mat.includes('dark_oak')) bg = '#3d2613';
+        else if (mat.includes('pale oak') || mat.includes('pale_oak')) bg = '#e3d6c1';
+        else if (mat.includes('oak')) bg = '#a88656';
+        else if (mat.includes('spruce')) bg = '#573d26';
+        else if (mat.includes('birch')) bg = '#d4c592';
+        else if (mat.includes('jungle')) bg = '#a4715f';
+        else if (mat.includes('acacia')) bg = '#a75037';
+        else if (mat.includes('cherry')) bg = '#ffb6c1';
+        else if (mat.includes('bamboo')) bg = '#6ea14b';
+        else if (mat.includes('crimson')) bg = '#7e353e';
+        else if (mat.includes('dead')) bg = '#7d6148';
+        else if (mat.includes('mossy')) bg = '#5b7145';
+        else if (mat.includes('nether')) bg = '#4c1e1e';
+        else if (mat.includes('sand')) bg = '#d6cd98';
+        
+        // Stones / Minerals
+        else if (mat.includes('light gray') || mat.includes('light_gray')) bg = '#ababab';
+        else if (mat.includes('gray') || mat.includes('grey') || mat.includes('stone') || mat.includes('tuff')) bg = '#6c6f6c';
+        else if (mat.includes('deepslate')) bg = '#3b3b3b';
+        else if (mat.includes('diorite')) bg = '#c2c2c4';
+        else if (mat.includes('brick')) bg = '#8f4334';
+        else if (mat.includes('iron')) bg = '#e6e6e6';
+        else if (mat.includes('oxidized')) bg = '#419688';
+        else if (mat.includes('copper')) bg = '#b86e4f';
+        else if (mat.includes('sulphur')) bg = '#e3e364';
+        else if (mat.includes('prismarine')) bg = '#61a39f';
+        // Explicit Colors
+        else if (mat.includes('light blue') || mat.includes('light_blue')) bg = '#3ab3da';
+        else if (mat.includes('blue')) bg = '#3c44aa';
+        else if (mat.includes('cyan')) bg = '#169c9c';
+        else if (mat.includes('lime')) bg = '#80c71f';
+        else if (mat.includes('green')) bg = '#5e7c16';
+        else if (mat.includes('pink')) bg = '#f28fad';
+        else if (mat.includes('magenta')) bg = '#c74ebd';
+        else if (mat.includes('purple')) bg = '#8932b8';
+        else if (mat.includes('black')) bg = '#1d1d21';
+        else if (mat.includes('white')) bg = '#f9fffe';
+        else if (mat.includes('orange')) bg = '#f07613';
+        else if (mat.includes('red') || mat.includes('cinnabar')) bg = '#b02e26';
+        else if (mat.includes('yellow')) bg = '#fed83d';
+        
+        // Calculate text color over background
+        const hex = bg.replace('#','');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const yiq = ((r*299)+(g*587)+(b*114))/1000;
+        const textSrc = (yiq >= 128) ? '#111' : '#fff';
+        
+        return { bg, fg: textSrc };
+    }
+    const canvas = document.getElementById('editorCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let template = {
+        type: "road",
+        maxGradient: 2,
+        maxSequence: 10,
+        stairMinBlocks: 0,
+        parts: [],
+        stairs: null
+    };
+
+    let activePartIndex = -1; 
+    let isEditingStairs = false;
+    let recentBlocks = ["minecraft:stone", "minecraft:air", "minecraft:oak_fence"];
+    const CELL_SIZE = 40;
+    
+    const playerImg = new Image();
+    playerImg.src = 'designer/playerback.png';
+
+    function init() {
+        addNewPart(); // Start with Part 1
+        updateRecentBlocksUI();
+        renderTabs();
+    }
+
+    function createEmptyGrid(width, height) {
+        return Array(height).fill().map(() => Array(width).fill("minecraft:air"));
+    }
+
+    function addNewPart() {
+        let activePart = null;
+        if (activePartIndex >= 0 && activePartIndex < template.parts.length) {
+            activePart = template.parts[activePartIndex];
+        } else if (template.parts.length > 0) {
+            activePart = template.parts[template.parts.length - 1]; // fallback to last created
+        }
+
+        const baseW = activePart ? activePart.width : 5;
+        const baseH = activePart ? activePart.height : 6;
+        const baseGround = activePart ? activePart.groundLayer : 0;
+        
+        let baseGrid;
+        if (activePart && activePart.grid) {
+            baseGrid = JSON.parse(JSON.stringify(activePart.grid)); // Deep copy grid to preserve references
+        } else {
+            baseGrid = createEmptyGrid(baseW, baseH);
+        }
+        
+        // Calculate a smart repeat interval based on previous
+        let nextRepeat = template.parts.length === 0 ? 1 : (parseInt(activePart ? activePart.repeatEvery : 0) + 1);
+
+        const newPart = {
+            width: baseW,
+            height: baseH,
+            groundLayer: baseGround,
+            playerOffset: activePart && activePart.playerOffset !== undefined ? activePart.playerOffset : null,
+            repeatEvery: nextRepeat,
+            grid: baseGrid
+        };
+        template.parts.push(newPart);
+        selectPart(template.parts.length - 1);
+        renderTabs();
+    }
+    
+    function initStairs() {
+        if (!template.stairs) {
+            template.stairs = { width: 3, height: 1, groundLayer: 0, repeatEvery: 0, grid: createEmptyGrid(3, 1) };
+        }
+    }
+
+    function getActivePart() {
+        if (isEditingStairs) return template.stairs;
+        if (activePartIndex >= 0 && activePartIndex < template.parts.length) return template.parts[activePartIndex];
+        return null;
+    }
+
+    function selectPart(index) {
+        isEditingStairs = false;
+        activePartIndex = index;
+        loadPartProperties();
+        renderTabs();
+        draw();
+    }
+    
+    function toggleStairs() {
+        isEditingStairs = true;
+        initStairs();
+        loadPartProperties();
+        renderTabs();
+        draw();
+    }
+
+    function updatePartDimensions() {
+        const part = getActivePart();
+        if (!part) return;
+        
+        const newW = parseInt(document.getElementById('partWidth').value) || 5;
+        let coreH = parseInt(document.getElementById('partHeight').value) || 6;
+        let baseH = 0;
+        
+        if (template.type === 'pillar') {
+            baseH = parseInt(document.getElementById('partGroundLayer').value) || 0;
+        }
+        
+        const newH = coreH + baseH;
+        
+        const newGrid = createEmptyGrid(newW, newH);
+        for(let y = 0; y < Math.min(part.height, newH); y++) {
+            for(let x = 0; x < Math.min(part.width, newW); x++) {
+                // To keep centering correct, might need an offset, but simple bottom-left alignment for now
+                // Actually, original plugin centers horizontally.
+                // Let's copy from center to center.
+                const oldCx = Math.floor(part.width / 2);
+                const newCx = Math.floor(newW / 2);
+                const xOffset = newCx - oldCx;
+                if (x + xOffset >= 0 && x + xOffset < newW) {
+                    newGrid[y][x + xOffset] = part.grid[y][x];
+                }
+            }
+        }
+        
+        part.width = newW;
+        part.height = newH;
+        if (template.type === 'pillar') part.groundLayer = baseH;
+        part.grid = newGrid;
+        draw();
+    }
+    
+    function toggleStartHere(checked) {
+        if (isEditingStairs) return;
+        template.parts.forEach(p => p.startHere = false);
+        if (checked) {
+            const part = getActivePart();
+            if (part) part.startHere = true;
+        }
+        renderTabs();
+    }
+
+    function toggleTriggerMode(mode) {
+        const rpeInput = document.getElementById('partRepeatEvery');
+        const trigInput = document.getElementById('partTriggerPositions');
+        if (mode === 'position') {
+            rpeInput.style.display = 'none';
+            trigInput.style.display = 'inline-block';
+        } else {
+            rpeInput.style.display = 'inline-block';
+            trigInput.style.display = 'none';
+        }
+        savePartProperties();
+    }
+
+    function savePartProperties() {
+        const part = getActivePart();
+        if (!part) return;
+        part.groundLayer = parseInt(document.getElementById('partGroundLayer').value) || 0;
+        const offsetVal = document.getElementById('partPlayerOffset').value.trim();
+        part.playerOffset = offsetVal !== "" ? parseInt(offsetVal) : null;
+        part.repeatEvery = parseInt(document.getElementById('partRepeatEvery').value) || 1;
+        part.buildUntil = parseInt(document.getElementById('partBuildUntil').value) || 0;
+        
+        const mode = document.getElementById('partTriggerMode').value;
+        if (mode === 'position') {
+            const raw = document.getElementById('partTriggerPositions').value;
+            const positions = raw.split(',')
+                .map(s => parseInt(s.trim()))
+                .filter(n => !isNaN(n) && n > 0);
+            part.triggerPositions = positions.length > 0 ? positions : null;
+        } else {
+            part.triggerPositions = null;
+        }
+
+        if (template.type === 'pillar') {
+            updatePartDimensions();
+        } else {
+            draw();
+        }
+    }
+
+        function loadPartProperties() {
+        const part = getActivePart();
+        
+        if (template.type === 'pillar') {
+            document.getElementById('groundLayerLabel').textContent = 'Base Height:';
+            document.getElementById('groundLayerLabel').style.color = '#50fa7b';
+            document.getElementById('buildUntilDiv').style.display = 'flex';
+            document.getElementById('playerOffsetDiv').style.display = 'flex';
+        } else {
+            document.getElementById('groundLayerLabel').textContent = 'Ground Index:';
+            document.getElementById('groundLayerLabel').style.color = '';
+            document.getElementById('buildUntilDiv').style.display = 'none';
+            document.getElementById('playerOffsetDiv').style.display = 'flex';
+        }
+        if (!part) return;
+        document.getElementById('partWidth').value = part.width;
+        if (template.type === 'pillar') {
+            document.getElementById('partHeight').value = Math.max(1, part.height - part.groundLayer);
+        } else {
+            document.getElementById('partHeight').value = part.height;
+        }
+        document.getElementById('partGroundLayer').value = part.groundLayer;
+        document.getElementById('partPlayerOffset').value = (part.playerOffset !== undefined && part.playerOffset !== null) ? part.playerOffset : '';
+        document.getElementById('partBuildUntil').value = part.buildUntil || 0;
+        
+        const rpeInput = document.getElementById('partRepeatEvery');
+        const trigInput = document.getElementById('partTriggerPositions');
+        const modeSelect = document.getElementById('partTriggerMode');
+
+        if (isEditingStairs) {
+            modeSelect.disabled = true;
+            rpeInput.disabled = true;
+            trigInput.disabled = true;
+            rpeInput.value = 0;
+            modeSelect.value = 'repeat';
+            rpeInput.style.display = 'inline-block';
+            trigInput.style.display = 'none';
+            document.getElementById('partToolbar').style.background = '#ffb86c33';
+            document.getElementById('startHereDiv').style.display = 'none';
+        } else {
+            modeSelect.disabled = false;
+            rpeInput.disabled = false;
+            trigInput.disabled = false;
+            rpeInput.value = part.repeatEvery || 1;
+            
+            if (part.triggerPositions && part.triggerPositions.length > 0) {
+                modeSelect.value = 'position';
+                trigInput.value = part.triggerPositions.join(', ');
+                rpeInput.style.display = 'none';
+                trigInput.style.display = 'inline-block';
+            } else {
+                modeSelect.value = 'repeat';
+                trigInput.value = '';
+                rpeInput.style.display = 'inline-block';
+                trigInput.style.display = 'none';
+            }
+
+            document.getElementById('startHereDiv').style.display = 'flex';
+            document.getElementById('partStartHere').checked = !!part.startHere;
+            document.getElementById('partToolbar').style.background = 'transparent';
+        }
+    }
+
+    function renderTabs() {
+        const tabsDiv = document.getElementById('partsTabs');
+        tabsDiv.innerHTML = '';
+        
+        template.parts.forEach((p, i) => {
+            const btn = document.createElement('div');
+            btn.className = 'tab' + (!isEditingStairs && activePartIndex === i ? ' active' : '');
+            
+            let startBadge = p.startHere ? ' ★' : '';
+            let triggerInfo = '';
+            if (p.triggerPositions && p.triggerPositions.length > 0) {
+                triggerInfo = ' [Step ' + p.triggerPositions.join(',') + ']';
+            } else if (p.repeatEvery) {
+                triggerInfo = ' (Rep ' + p.repeatEvery + ')';
+            }
+            if (template.type === 'pillar') {
+                btn.textContent = 'Pillar ' + (i + 1) + triggerInfo + startBadge;
+            } else {
+                btn.textContent = 'Part ' + (i + 1) + triggerInfo + startBadge;
+            }
+            
+            btn.onclick = () => selectPart(i);
+            tabsDiv.appendChild(btn);
+        });
+        
+        if (isEditingStairs) {
+            const btn = document.createElement('div');
+            btn.className = 'tab active';
+            btn.style.background = '#ffb86c';
+            btn.textContent = 'Stairs (Editing)';
+            tabsDiv.appendChild(btn);
+        }
+    }
+
+        function fillCustomShape(ctx, px, py, size, blockOrig, bgColor) {
+        let block = blockOrig.toLowerCase();
+        ctx.fillStyle = bgColor;
+        
+        if (block.includes('slab') && !block.includes('double')) {
+            let isTop = block.includes('type=top');
+            if (isTop) {
+                ctx.fillRect(px, py, size, size / 2); // Top half
+            } else {
+                ctx.fillRect(px, py + size / 2, size, size / 2); // Bottom half
+            }
+            return;
+        }
+        
+        if (block.includes('stairs')) {
+            let isTop = block.includes('half=top');
+            let facingParts = block.match(/facing=([a-z]+)/);
+            let facing = facingParts ? facingParts[1] : 'north';
+            
+            // Fill full block
+            ctx.fillRect(px, py, size, size);
+            
+            if (facing === 'north') {
+                // Nothing missing
+            } else if (facing === 'south') {
+                // Facing you: full block with horizontal line
+                // To keep line transparent but visible, clear a 2px strip
+                ctx.clearRect(px, py + size/2 - 1, size, 2);
+            } else if (facing === 'east') {
+                // Facing right (East)
+                if (isTop) {
+                    ctx.clearRect(px + size/2, py + size/2, size/2 + 2, size/2 + 2); // Bottom-right missing
+                } else {
+                    ctx.clearRect(px + size/2, py - 2, size/2 + 2, size/2 + 2); // Top-right missing
+                }
+            } else if (facing === 'west') {
+                // Facing left (West)
+                if (isTop) {
+                    ctx.clearRect(px - 2, py + size/2, size/2 + 2, size/2 + 2); // Bottom-left missing
+                } else {
+                    ctx.clearRect(px - 2, py - 2, size/2 + 2, size/2 + 2); // Top-left missing
+                }
+            }
+            return;
+        }
+        
+        ctx.fillRect(px, py, size, size);
+    }
+
+function updateCanvasSize(part) {
+        if (!part) return;
+        const gridWPix = part.width * CELL_SIZE;
+        const gridHPix = part.height * CELL_SIZE;
+        
+        const topMargin = (template.type === 'road') ? 100 : 60;
+        const bottomMargin = 60;
+        const paddingX = 80;
+        
+        const container = document.getElementById('canvasContainer');
+        const contW = (container && container.clientWidth > 40) ? (container.clientWidth - 40) : 800;
+        const contH = (container && container.clientHeight > 40) ? (container.clientHeight - 40) : 500;
+        
+        const neededW = Math.max(800, contW, gridWPix + paddingX * 2);
+        const neededH = Math.max(500, contH, gridHPix + topMargin + bottomMargin);
+        
+        if (canvas.width !== neededW || canvas.height !== neededH) {
+            canvas.width = neededW;
+            canvas.height = neededH;
+        }
+    }
+
+    function getGridOffsets(part) {
+        const gridWPix = part.width * CELL_SIZE;
+        const gridHPix = part.height * CELL_SIZE;
+        const offsetX = Math.floor((canvas.width - gridWPix) / 2);
+        const topMargin = (template.type === 'road') ? 100 : 60;
+        const offsetY = Math.max(topMargin, Math.floor((canvas.height - gridHPix) / 2));
+        return { gridWPix, gridHPix, offsetX, offsetY };
+    }
+
+    function draw() {
+        const part = getActivePart();
+        if (!part) return;
+        
+        updateCanvasSize(part);
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Offset rendering so it appears centered
+        const { gridWPix, gridHPix, offsetX, offsetY } = getGridOffsets(part);
+
+        // Draw grid setup
+        // In simple JSON, index 0 is ground (bottom), index H-1 is top.
+        // Canvas Y=0 is TOP. So we render row=y at canvas Y = offsetY + (part.height - 1 - y) * CELL_SIZE
+        
+        // If pillar has base height, draw a visually separating thick green line
+        if (template.type === 'pillar' && part.groundLayer > 0) {
+            let baseH = parseInt(part.groundLayer);
+            let sepY = offsetY + (part.height - baseH) * CELL_SIZE;
+            ctx.fillStyle = '#50fa7b';
+            ctx.fillRect(offsetX, sepY - 2, part.width * CELL_SIZE, 4);
+        }
+
+        for (let y = 0; y < part.height; y++) {
+            for (let x = 0; x < part.width; x++) {
+                const drawY = (template.type === 'pillar') ? offsetY + (y * CELL_SIZE) : offsetY + (part.height - 1 - y) * CELL_SIZE;
+                const drawX = offsetX + x * CELL_SIZE;
+                
+                ctx.strokeStyle = '#44475a';
+                ctx.strokeRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
+                
+                const block = part.grid[y][x];
+                if (block && block !== "minecraft:air") {
+                    const colors = getBlockColors(block);
+                    fillCustomShape(ctx, drawX + 1, drawY + 1, CELL_SIZE - 2, block, colors.bg);
+                    ctx.fillStyle = colors.fg;
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    
+                    let shortName = block.replace('minecraft:', '');
+                    // Truncate long state tags for rendering
+                    if(shortName.indexOf('[') > -1) {
+                         const base = shortName.substring(0, shortName.indexOf('['));
+                         const tag = shortName.substring(shortName.indexOf('['));
+                         ctx.fillText(base, drawX + CELL_SIZE/2, drawY + Math.floor(CELL_SIZE/2) - 3);
+                         ctx.fillStyle = '#ff5555';
+                         ctx.fillText(tag.substring(1, tag.length-1), drawX + CELL_SIZE/2, drawY + Math.floor(CELL_SIZE/2) + 8);
+                    } else {
+                         ctx.fillText(shortName, drawX + CELL_SIZE/2, drawY + CELL_SIZE/2 + 3);
+                    }
+                }
+            }
+        }
+        
+        // Draw Player Indicator IF road (or maybe pillars too, but flipped?)
+        if (playerImg.complete && playerImg.width > 0) {
+            // Player stands at centerX, feet at groundLayer.
+            const pW = CELL_SIZE;
+            const pH = CELL_SIZE * 2;
+            const cx = (part.playerOffset !== undefined && part.playerOffset !== null) ? part.playerOffset : Math.floor(part.width / 2);
+            // groundLayer is the Y level ON WHICH player walks.
+            // If groundLayer = 0, feet are directly above the block y=0.
+            // Wait, in minecraft player stands ON the ground. Is groundlayer the block below feet?
+            // Yes. In LazyRoad, groundLayer is the block they walk ON.
+            const drawX = offsetX + cx * CELL_SIZE;
+            
+            // The block they walk ON is at row part.groundLayer.
+            // So its top coordinate is drawY. Feet start there.
+            let floorBlockYPix;
+            if (template.type === 'pillar') {
+                // Pillars start directly below the road. The player stands at the road surface.
+                floorBlockYPix = offsetY; 
+            } else {
+                floorBlockYPix = offsetY + (part.height - 1 - part.groundLayer) * CELL_SIZE;
+            }
+            
+            let playerDrawY = floorBlockYPix - pH;
+            
+            ctx.globalAlpha = 0.7;
+            ctx.drawImage(playerImg, drawX, playerDrawY, pW, pH);
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    let isMouseDown = false;
+    let lastPaintedCell = { x: -1, y: -1 };
+
+    function handleBlockClick(e) {
+        const part = getActivePart();
+        if (!part) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+        
+        const { offsetX, offsetY } = getGridOffsets(part);
+        
+        const x = Math.floor((mouseX - offsetX) / CELL_SIZE);
+        const drawY = Math.floor((mouseY - offsetY) / CELL_SIZE);
+        
+        // Convert drawY back to grid Y
+        const y = (template.type === 'pillar') ? drawY : part.height - 1 - drawY;
+        
+        if (x >= 0 && x < part.width && y >= 0 && y < part.height) {
+            if (lastPaintedCell.x === x && lastPaintedCell.y === y && e.type === 'mousemove') {
+                return;
+            }
+            lastPaintedCell = { x, y };
+
+            let material = document.getElementById('activeMaterial').value.trim();
+            
+            if (e.buttons === 1) { // Left click
+                if (material === '') {
+                    if (e.type === 'mousedown') {
+                        let cellData = part.grid[y][x];
+                        if (cellData && cellData !== 'minecraft:air') {
+                            document.getElementById('activeMaterial').value = cellData.replace(/^minecraft:/, '');
+                        }
+                    }
+                } else {
+                    if (!material.includes(':')) {
+                        material = 'minecraft:' + material;
+                    }
+                    part.grid[y][x] = material;
+                    addRecentBlock(material);
+                    draw();
+                }
+            } else if (e.buttons === 2) { // Right click
+                part.grid[y][x] = "minecraft:air";
+                draw();
+            }
+        }
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        handleBlockClick(e);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (isMouseDown && e.buttons !== 0) {
+            handleBlockClick(e);
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        isMouseDown = false;
+        lastPaintedCell = { x: -1, y: -1 };
+    });
+    
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('resize', () => draw());
+    playerImg.onload = draw;
+    
+    // UI Helpers
+    document.getElementById('addPartBtn').onclick = addNewPart;
+    document.getElementById('deletePartBtn').onclick = () => {
+        if(isEditingStairs) {
+            template.stairs = null;
+            if(template.parts.length > 0) selectPart(0);
+            return;
+        }
+        if (template.parts.length > 1) {
+            template.parts.splice(activePartIndex, 1);
+            selectPart(Math.max(0, activePartIndex - 1));
+        } else {
+            alert("A template must have at least one part!");
+        }
+    };
+    document.getElementById('editStairsBtn').onclick = toggleStairs;
+    
+            const setOrReplaceState = (val, key, value) => {
+        if (val.indexOf('[') > -1) {
+            let re = new RegExp('\\b' + key + '=[^\\]\\,]+');
+            if (re.test(val)) {
+                return val.replace(re, key + '=' + value);
+            } else {
+                if (val.indexOf(']') === val.length - 1) {
+                    let insertPos = val.length - 1;
+                    let suffix = (val.charAt(insertPos - 1) === '[') ? '' : ',';
+                    return val.substring(0, insertPos) + suffix + key + '=' + value + ']';
+                } else {
+                    return val + '[' + key + '=' + value + ']';
+                }
+            }
+        }
+        return val + '[' + key + '=' + value + ']';
+    };
+
+    function appendDirection(dir) {
+        let input = document.getElementById('activeMaterial');
+        input.value = setOrReplaceState(input.value, 'facing', dir);
+    }
+    
+    function appendStateSmart(position) {
+        let input = document.getElementById('activeMaterial');
+        let stateKey = (input.value.includes('slab')) ? 'type' : 'half';
+        input.value = setOrReplaceState(input.value, stateKey, position);
+    }
+
+    function appendState(state) {
+        let input = document.getElementById('activeMaterial');
+        let parts = state.split('=');
+        input.value = setOrReplaceState(input.value, parts[0], parts[1]);
+    }
+    
+    function addRecentBlock(mat) {
+        if (mat === 'minecraft:air') return;
+        if (!recentBlocks.includes(mat)) {
+            recentBlocks.unshift(mat);
+            if (recentBlocks.length > 15) recentBlocks.pop();
+            updateRecentBlocksUI();
+        }
+    }
+    
+    function updateRecentBlocksUI() {
+        const container = document.getElementById('recentBlocksList');
+        container.innerHTML = '';
+        recentBlocks.forEach(b => {
+            const el = document.createElement('div');
+            el.className = 'recent-block';
+            el.textContent = b.replace('minecraft:','');
+            el.onclick = () => { document.getElementById('activeMaterial').value = b.replace(/^minecraft:/, ''); };
+            container.appendChild(el);
+        });
+    }
+
+    
+
+        document.getElementById('exportBtn').onclick = () => {
+        let explicitMaxSeq = parseInt(document.getElementById('globalMaxSequence').value) || 0;
+        let calculatedMaxSequence = explicitMaxSeq > 0 ? explicitMaxSeq : 1;
+        template.parts.forEach(p => { 
+            if (p.triggerPositions && p.triggerPositions.length > 0) {
+                p.triggerPositions.forEach(pos => {
+                    if (pos > calculatedMaxSequence) calculatedMaxSequence = pos;
+                });
+            } else {
+                let r = parseInt(p.repeatEvery);
+                if (r > calculatedMaxSequence) calculatedMaxSequence = r;
+            }
+        });
+
+        let sortedParts = JSON.parse(JSON.stringify(template.parts));
+        if (template.type === 'road') {
+            // Put trigger position parts first, or sort by repeatEvery
+            sortedParts.sort((a, b) => {
+                if (a.triggerPositions && !b.triggerPositions) return -1;
+                if (!a.triggerPositions && b.triggerPositions) return 1;
+                return (b.repeatEvery || 1) - (a.repeatEvery || 1);
+            });
+        }
+
+        let jsonOutput = {
+            type: template.type,
+            maxGradient: parseInt(document.getElementById('globalMaxGradient').value) || 2,
+            maxSequence: calculatedMaxSequence,
+            stairMinBlocks: parseInt(document.getElementById('globalStairMinBlocks').value) || 0,
+            parts: sortedParts.map(p => {
+                if (template.type === 'pillar') {
+                    let h = parseInt(p.height);
+                    let baseH = parseInt(p.groundLayer) || 0;
+                    let realH = h - baseH;
+                    let obj = {
+                        height: realH,
+                        width: parseInt(p.width),
+                        repeatEvery: parseInt(p.repeatEvery) || 1,
+                        buildUntil: parseInt(p.buildUntil) || 0,
+                        blockDatas: p.grid.slice(0, realH)
+                    };
+                    if (p.playerOffset !== undefined && p.playerOffset !== null) {
+                        obj.playerOffset = parseInt(p.playerOffset);
+                    }
+                    if (p.startHere) {
+                        obj.startHere = true;
+                    }
+                    if (p.triggerPositions && p.triggerPositions.length > 0) {
+                        obj.triggerPositions = p.triggerPositions;
+                    }
+                    if (baseH > 0) {
+                        obj.baseHeight = baseH;
+                        obj.baseBlockDatas = p.grid.slice(realH, h);
+                    }
+                    return obj;
+                } else {
+                    let partObj = {
+                        height: parseInt(p.height),
+                        width: parseInt(p.width),
+                        groundLayer: parseInt(p.groundLayer),
+                        repeatEvery: parseInt(p.repeatEvery),
+                        blockDatas: p.grid
+                    };
+                    if (p.playerOffset !== undefined && p.playerOffset !== null) {
+                        partObj.playerOffset = parseInt(p.playerOffset);
+                    }
+                    if (p.startHere) {
+                        partObj.startHere = true;
+                    }
+                    if (p.triggerPositions && p.triggerPositions.length > 0) {
+                        partObj.triggerPositions = p.triggerPositions;
+                    }
+                    return partObj;
+                }
+            })
+        };
+        
+        if (template.stairs && template.stairs.grid) {
+            let stairsObj = {
+                height: parseInt(template.stairs.height),
+                width: parseInt(template.stairs.width),
+                groundLayer: parseInt(template.stairs.groundLayer),
+                repeatEvery: 0,
+                blockDatas: template.stairs.grid
+            };
+            if (template.stairs.playerOffset !== undefined && template.stairs.playerOffset !== null) {
+                stairsObj.playerOffset = parseInt(template.stairs.playerOffset);
+            }
+            jsonOutput.stairs = stairsObj;
+        }
+        
+        let outStr = JSON.stringify(jsonOutput, null, 2);
+
+        outStr = outStr.replace(/minecraft:([a-z_]*rail)\[facing=(north|south)\]/g, "minecraft:$1[shape=north_south]");
+        outStr = outStr.replace(/minecraft:([a-z_]*rail)\[facing=(east|west)\]/g, "minecraft:$1[shape=east_west]");
+        outStr = outStr.replace(/minecraft:redstone_wire\[facing=[a-z]+\]/g, "minecraft:redstone_wire");
+        
+        document.getElementById('jsonOutput').value = outStr;
+    };
+
+    window.updateDesignMode = function() {
+        const select = document.getElementById('templateType');
+        if (confirm("Changing the template type will erase your current work. Proceed?")) {
+            template.type = select.value;
+            template.parts = [];
+            activePartIndex = -1;
+            isEditingStairs = false;
+            document.getElementById('jsonOutput').value = '';
+            addNewPart();
+        } else {
+            select.value = template.type; // revert visual dropdown
+        }
+    };
+
+        let loadTargetType = 'road';
+    
+    function triggerLoad(type) {
+        loadTargetType = type;
+        document.getElementById('fileInput').click();
+    }
+    
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            parseAndLoadJson(e.target.result, loadTargetType);
+            event.target.value = ''; // reset
+        };
+        reader.readAsText(file);
+    }
+    
+    function handleManualLoad() {
+        const text = document.getElementById('jsonOutput').value;
+        if (!text.trim()) return alert("Please paste JSON into the textbox first!");
+        parseAndLoadJson(text, 'auto');
+    }
+    
+    function parseAndLoadJson(jsonString, targetType) {
+        try {
+            const data = JSON.parse(jsonString);
+            
+            if (targetType === 'auto') {
+                if (data.type) {
+                    targetType = data.type;
+                } else if (data.parts && data.parts.length > 0 && typeof data.parts[0].groundLayer !== 'undefined') {
+                    targetType = 'road';
+                } else {
+                    targetType = 'pillar';
+                }
+            }
+            
+            // Set global variables
+            document.getElementById('templateType').value = targetType;
+            template.type = targetType;
+            
+            // Note: Use standard HTML operators for value setting
+            document.getElementById('globalMaxGradient').value = data.maxGradient || 2;
+            document.getElementById('globalMaxSequence').value = data.maxSequence || 10;
+            document.getElementById('globalStairMinBlocks').value = data.stairMinBlocks || 0;
+            
+            template.parts = [];
+            if (data.parts && Array.isArray(data.parts)) {
+                data.parts.forEach(p => {
+                    if (targetType === 'pillar' && p.baseHeight > 0) {
+                        template.parts.push({
+                            width: p.width,
+                            height: p.height + p.baseHeight,
+                            groundLayer: p.baseHeight,
+                            playerOffset: p.playerOffset !== undefined ? p.playerOffset : null,
+                            startHere: !!p.startHere,
+                            repeatEvery: p.repeatEvery || 1,
+                            buildUntil: p.buildUntil || 0,
+                            triggerPositions: (p.triggerPositions && Array.isArray(p.triggerPositions)) ? p.triggerPositions : null,
+                            grid: p.blockDatas.concat(p.baseBlockDatas)
+                        });
+                    } else {
+                        template.parts.push({
+                            width: p.width,
+                            height: p.height,
+                            groundLayer: p.groundLayer || 0,
+                            playerOffset: p.playerOffset !== undefined ? p.playerOffset : null,
+                            startHere: !!p.startHere,
+                            repeatEvery: p.repeatEvery || 1,
+                            buildUntil: p.buildUntil || 0,
+                            triggerPositions: (p.triggerPositions && Array.isArray(p.triggerPositions)) ? p.triggerPositions : null,
+                            grid: p.blockDatas 
+                        });
+                    }
+                });
+            }
+            
+            if (data.stairs && data.stairs.blockDatas) {
+                template.stairs = {
+                    width: data.stairs.width,
+                    height: data.stairs.height,
+                    groundLayer: data.stairs.groundLayer || 0,
+                    playerOffset: data.stairs.playerOffset !== undefined ? data.stairs.playerOffset : null,
+                    repeatEvery: 0,
+                    grid: data.stairs.blockDatas
+                };
+            } else {
+                template.stairs = null;
+            }
+            
+            if (template.parts.length === 0) addNewPart();
+            else selectPart(0);
+            
+            alert("Loaded successfully!");
+        } catch (err) {
+            alert("Error parsing JSON: " + err.message);
+        }
+    }
+    init();
+</script>
+</body>
+</html>

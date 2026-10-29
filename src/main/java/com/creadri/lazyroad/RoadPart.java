@@ -1,23 +1,20 @@
 package com.creadri.lazyroad;
 
-import java.io.Serializable;
-
-/**
- *
- * @author creadri
- */
-public class RoadPart implements Comparable<RoadPart>, Serializable {
-    private int[][] ids;
-    private byte[][] datas;
+public class RoadPart implements Comparable<RoadPart> {
+    private String[][] blockDatas;
     private int height;
     private int width;
 
     private int groundLayer;
     private int repeatEvery;
+    private Integer playerOffset;
+    private boolean startHere;
+    private java.util.List<Integer> triggerPositions;
+
+    public RoadPart() {}
 
     public RoadPart(int height, int width) {
-        ids = new int[height][width];
-        datas = new byte[height][width];
+        blockDatas = new String[height][width];
         this.height = height;
         this.width = width;
     }
@@ -30,16 +27,39 @@ public class RoadPart implements Comparable<RoadPart>, Serializable {
         return count % repeatEvery == 0;
     }
 
-    public byte[] getData(int height) {
-        return datas[height];
+    public String[][] getBlockDatas() {
+        return blockDatas;
     }
 
-    public byte[][] getDatas() {
-        return datas;
+    public void setBlockDatas(String[][] blockDatas) {
+        this.blockDatas = blockDatas;
     }
 
-    public void setDatas(byte[][] datas) {
-        this.datas = datas;
+    public int getPlayerOffset() {
+        if (playerOffset != null) {
+            return playerOffset;
+        }
+        return width / 2;
+    }
+
+    public void setPlayerOffset(Integer playerOffset) {
+        this.playerOffset = playerOffset;
+    }
+
+    public java.util.List<Integer> getTriggerPositions() {
+        return triggerPositions;
+    }
+
+    public void setTriggerPositions(java.util.List<Integer> triggerPositions) {
+        this.triggerPositions = triggerPositions;
+    }
+
+    public boolean isStartHere() {
+        return startHere;
+    }
+
+    public void setStartHere(boolean startHere) {
+        this.startHere = startHere;
     }
 
     public int getGroundLayer() {
@@ -58,18 +78,6 @@ public class RoadPart implements Comparable<RoadPart>, Serializable {
         this.height = height;
     }
 
-    public int[] getIds(int height) {
-        return ids[height];
-    }
-
-    public int[][] getIds() {
-        return ids;
-    }
-
-    public void setIds(int[][] ids) {
-        this.ids = ids;
-    }
-
     public int getRepeatEvery() {
         return repeatEvery;
     }
@@ -86,34 +94,13 @@ public class RoadPart implements Comparable<RoadPart>, Serializable {
         this.width = width;
     }
 
-    public void setSize(int newWidth, int newHeight) {
-
-        int[][] newids = new int[newHeight][newWidth];
-        byte[][] newdatas = new byte[newHeight][newWidth];
-
-        int imax = Math.min(height, newHeight);
-        int jmax = Math.min(width, newWidth);
-
-        for (int i = 0; i < imax; i++) {
-            for (int j = 0; j < jmax; j++) {
-                newids[i][j] = ids[i][j];
-                newdatas[i][j] = datas[i][j];
-            }
-        }
-
-        ids = newids;
-        datas = newdatas;
-        width = newWidth;
-        height = newHeight;
-    }
-
     @Override
     public int compareTo(RoadPart o) {
-        return o.repeatEvery - repeatEvery;
-    }
-
-    @Override
-    public String toString() {
-        return "Road Part " + Integer.toString(repeatEvery);
+        if (repeatEvery > o.repeatEvery) {
+            return -1;
+        } else if (repeatEvery < o.repeatEvery) {
+            return 1;
+        }
+        return 0;
     }
 }

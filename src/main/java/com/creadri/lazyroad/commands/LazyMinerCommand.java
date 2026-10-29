@@ -29,6 +29,7 @@ public class LazyMinerCommand extends CommandHandler {
         Player player = (Player) sender;
         if (!player.hasPermission("lazyroad.lazyminer")) {
             player.sendMessage(plugin.getMessage("messages.noPermission"));
+            return true;
         }
         String playerName = player.getName();
         LazyMiner lm = plugin.getLazyMiner(playerName);
@@ -53,13 +54,12 @@ public class LazyMinerCommand extends CommandHandler {
                 return true;
             case 1:
                 if (args[0].equalsIgnoreCase("store")) {
-                    if (lm != null) {
-                        lm.putBlocks();
-                        return true;
-                    } else {
-                        player.sendMessage(plugin.getMessage("messages.lazyminer.drops"));
-                        return true;
+                    if (lm == null) {
+                        lm = new LazyMiner(plugin, player);
+                        plugin.putLazyMiner(player.getName(), lm);
                     }
+                    lm.putBlocks();
+                    return true;
                 } else if (args[0].equalsIgnoreCase("ids")) {
                     if (lm != null) {
                         player.sendMessage(plugin.getMessage("messages.lazyminer.ids", lm.checkIdsToString()));
@@ -69,6 +69,7 @@ public class LazyMinerCommand extends CommandHandler {
                         return true;
                     }
                 }
+                return false;
             case 2:
                 if (args[0].equalsIgnoreCase("addid")) {
                     if (lm != null) {
@@ -110,6 +111,7 @@ public class LazyMinerCommand extends CommandHandler {
                         return true;
                     }
                 }
+                return false;
             default:
                 return false;
         }

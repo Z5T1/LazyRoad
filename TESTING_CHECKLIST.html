@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📋 LazyRoad RC Regression Testing Checklist</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --accent-dim: rgba(16, 185, 129, 0.15);
+      --code-bg: #0b1220;
+      --code-border: #334155;
+      --code-color: #38bdf8;
+      --danger: #ef4444;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+      padding-bottom: 80px;
+    }
+
+    header.sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-content {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      background: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background: #475569;
+      color: #ffffff;
+    }
+
+    button.btn-danger:hover {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #ffffff;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #38bdf8);
+      width: 0%;
+      transition: width 0.25s ease-out;
+    }
+
+    .progress-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+    }
+
+    .filter-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    main {
+      max-width: 900px;
+      margin: 24px auto 0 auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .subtitle-note {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      background: var(--card-bg);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .section-header {
+      padding: 14px 18px;
+      background: rgba(30, 41, 59, 0.8);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-header:hover {
+      background: #253349;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-count {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .checklist-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .subheading {
+      padding: 10px 18px 6px 18px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-top: 1px dashed var(--card-border);
+    }
+
+    .subheading:first-child {
+      border-top: none;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 18px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .check-item:last-child {
+      border-bottom: none;
+    }
+
+    .check-item:hover {
+      background-color: rgba(255, 255, 255, 0.025);
+    }
+
+    .check-item.nested {
+      padding-left: 44px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .check-item.completed {
+      background: rgba(16, 185, 129, 0.04);
+    }
+
+    .check-item.completed .item-content {
+      color: var(--text-dim);
+    }
+
+    .check-item.completed .item-title {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .custom-checkbox {
+      margin-top: 2px;
+      width: 19px;
+      height: 19px;
+      border: 2px solid #64748b;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: #0f172a;
+      transition: all 0.15s ease;
+    }
+
+    .check-item.completed .custom-checkbox {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .custom-checkbox svg {
+      display: none;
+      width: 13px;
+      height: 13px;
+      stroke: #0f172a;
+      stroke-width: 3;
+      fill: none;
+    }
+
+    .check-item.completed .custom-checkbox svg {
+      display: block;
+    }
+
+    .item-content {
+      flex: 1;
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .item-title {
+      font-weight: 600;
+      color: #f8fafc;
+      margin-right: 6px;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--code-bg);
+      color: var(--code-color);
+      border: 1px solid var(--code-border);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .template-item {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #7dd3fc;
+    }
+
+    @media (max-width: 640px) {
+      .header-content {
+        gap: 10px;
+      }
+      .title-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .btn-group {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .check-item.nested {
+        padding-left: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="sticky-header">
+    <div class="header-content">
+      <div class="title-row">
+        <h1>📋 LazyRoad RC Regression Testing</h1>
+        <div class="btn-group">
+          <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="pending">Pending</button>
+            <button class="filter-btn" data-filter="completed">Done</button>
+          </div>
+          <button id="btn-reset" class="btn-danger" title="Reset all checkboxes">Reset</button>
+        </div>
+      </div>
+      <div class="progress-bar-container">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      </div>
+      <div class="progress-stats">
+        <span id="progress-text">0 of 44 completed (0%)</span>
+        <span id="status-hint">Auto-saves in browser</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="subtitle-note">
+      Use this interactive checklist prior to packaging and tagging any new Release Candidate (RC) or stable release build.
+      Click anywhere on an item or its checkbox to toggle completion. Progress is automatically saved locally.
+    </div>
+
+    <!-- Section 1 -->
+    <section class="section-card" data-section="1">
+      <div class="section-header">
+        <div class="section-title">1. In-Game Movement &amp; Road Following (2:1 Snapping)</div>
+        <div class="section-count" id="count-sec-1">0/4</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec1-curved">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Curved Road Tracking:</span> With <code>/lr straight</code> disabled (default), walk diagonally across the landscape. Road follows you smoothly (2 blocks forward for 1 block to the side) without stalling or skipping.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec1-straight">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Straight Lock:</span> Run <code>/lr straight</code> and verify the road stays locked along a single cardinal axis even if you drift laterally.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec1-turns">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">90-Degree Turns:</span> Walk straight, turn 90° left/right, and continue walking. Verify the corner draws cleanly without leaving open holes or corrupted blocks.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec1-backtrack">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Backtracking Protection:</span> Stop and turn 180° back over the freshly laid road. Verify it does not overwrite or corrupt previously placed blocks.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2 -->
+    <section class="section-card" data-section="2">
+      <div class="section-header">
+        <div class="section-title">2. Terrain Slope &amp; Stair Dynamics</div>
+        <div class="section-count" id="count-sec-2">0/4</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec2-uphill">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Uphill Incline:</span> Walk up a hill. Verify stairs spawn facing towards the slope so the player walks up the treads.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec2-downhill">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Downhill Decline:</span> Walk down a hill. Verify stairs reverse facing appropriately so the player steps smoothly down the treads.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec2-cardinal">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Cardinal Orientation:</span> Test uphill and downhill in all 4 cardinal directions (North, South, East, West) to confirm no 90° or 180° rotation inversion.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec2-gradient">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Max Gradient Rule:</span> Confirm that roads respect <code>maxGradient</code> (stairs do not trigger too frequently or bunch up on gentle slopes).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3 -->
+    <section class="section-card" data-section="3">
+      <div class="section-header">
+        <div class="section-title">3. Block States &amp; Physics</div>
+        <div class="section-count" id="count-sec-3">0/4</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec3-fences">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Fences &amp; Walls:</span> Place templates with fences or wall blocks; verify they automatically connect to each other and neighboring solid blocks on placement.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec3-directional">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Directional Blocks:</span> Verify stairs, logs, glazed terracotta, and directional utility blocks face the expected direction relative to travel.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec3-slabs">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Upside-Down Stairs &amp; Slabs:</span> Verify half-height states (<code>half=top</code>, <code>half=bottom</code>, <code>type=top</code>, <code>type=bottom</code>) preserve their orientation and height.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec3-lanterns">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Lanterns &amp; Hanging Blocks:</span> Verify hanging lanterns (<code>hanging=true</code>) attach to blocks above rather than floating or falling.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4 -->
+    <section class="section-card" data-section="4">
+      <div class="section-header">
+        <div class="section-title">4. Alternating &amp; Repeating Sequences (OuterWall / Complex Roads)</div>
+        <div class="section-count" id="count-sec-4">0/2</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec4-modulo">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Odd vs. Even Modulo (OuterWall Check):</span> For templates with multiple alternating parts (e.g. Part 1 repeating every 2, Part 2 repeating every 1), verify both parts alternate properly and neither part is skipped.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec4-sequences">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Long Sequences:</span> Walk 30+ blocks with a multi-part road to ensure modulo counter cadence stays consistent across chunk boundaries.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5 -->
+    <section class="section-card" data-section="5">
+      <div class="section-header">
+        <div class="section-title">5. Bridges &amp; Pillars</div>
+        <div class="section-count" id="count-sec-5">0/5</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec5-bridge-altitude">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Bridge Altitude Lock:</span> Run <code>/lb &lt;road&gt; &lt;pillar&gt;</code> across a ravine or water body. Verify player altitude locks and blocks generate directly ahead of the player.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec5-pillar-ground">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Pillar Ground Snapping:</span> Verify pillar shafts extend all the way down to solid ground (ignoring water/leaves/air).
+          </div>
+        </div>
+        <div class="check-item" data-id="sec5-pillar-bases">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Pillar Bases:</span> For templates with base sections, verify the base structures generate from ground level upwards.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec5-arches-limit">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Build Max Lim / Arches:</span> For pillar templates with <code>buildUntil</code> / <code>buildMaxLim</code> (e.g. Classic5): Arches stop building downwards at their specified limit.
+          </div>
+        </div>
+        <div class="check-item nested" data-id="sec5-empty-limit">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            Empty/zero limits continue downwards to bedrock/ground.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 6 -->
+    <section class="section-card" data-section="6">
+      <div class="section-header">
+        <div class="section-title">6. Tunnels &amp; LazyMiner Excavation (<code>/lt</code>, <code>/lm</code>)</div>
+        <div class="section-count" id="count-sec-6">0/10</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec6-clearance">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Tunnel Clearance:</span> Run <code>/lt &lt;road&gt;</code> through a mountain. Verify the tunnel bores out the bounding box cleanly with headroom.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-void-no-lm">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Voiding Without LazyMiner:</span> With <code>/lm</code> disabled, excavated tunnel blocks void cleanly (no ground entity clutter or lag).
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-drops-deprecated">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Deprecated <code>/drops</code> Command:</span> Run <code>/lr drops</code> or <code>/lt drops</code>; verify notification that <code>/drops</code> has been consolidated into LazyMiner (<code>/lm</code>).
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-lm-toggle">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">LazyMiner Toggle (<code>/lm</code>):</span> Enable and disable LazyMiner mode with <code>/lm</code>. Verify status feedback and permission enforcement (<code>lazyroad.lazyminer</code>).
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-lm-collection">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Excavation Drop Collection:</span> Tunnel (or place roads through terrain) with <code>/lm</code> active. Verify blocks are stored silently in virtual buffer without dropping loose items on the ground.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-store-empty-buffer">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Store with Empty Buffer:</span> Run <code>/lm store</code> with no mined items. Verify friendly notification that you have no stored items to deposit.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-store-not-chest">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Target Validation:</span> Run <code>/lm store</code> while looking at air or stone. Verify prompt to look at a chest or container.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-store-success">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Deposit to Empty Chest:</span> Look at an empty chest or barrel and run <code>/lm store</code>. Verify all items transfer into chest and buffer is cleared.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-store-chest-full">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Full Chest Notification:</span> Look at a completely full chest and run <code>/lm store</code>. Verify warning that chest is full, zero items lost, and prompted to select another chest.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec6-store-partial-full">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Partial Fill Notification:</span> Look at a chest with only a few free slots; run <code>/lm store</code>. Verify it deposits what fits and alerts exact remaining stacks to put elsewhere.
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Section 7 -->
+    <section class="section-card" data-section="7">
+      <div class="section-header">
+        <div class="section-title">7. Core Commands &amp; Plugin Lifecycle</div>
+        <div class="section-count" id="count-sec-7">0/4</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec7-single-jar">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Single Active Jar:</span> Confirm only one <code>LazyRoad.jar</code> is in <code>plugins/</code>.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec7-default-preservation">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Default Template Preservation:</span> On startup/update, verify default templates are refreshed without overwriting or deleting custom player templates.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec7-undo">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Undo (<code>/lr undo</code>):</span> Build a section of road, run <code>/lr undo</code>, and verify the landscape (including destroyed blocks/terrain) is restored.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec7-error-handling">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Error Handling:</span> Test a road containing an invalid block string (<code>minecraft:fake_block</code>). Verify the server logs a silent warning and keeps running without crashing.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 8 -->
+    <section class="section-card" data-section="8">
+      <div class="section-header">
+        <div class="section-title">8. Web Designer (<code>designer/index.html</code>)</div>
+        <div class="section-count" id="count-sec-8">0/4</div>
+      </div>
+      <div class="checklist-group">
+        <div class="check-item" data-id="sec8-load-template">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Unified "Load Template":</span> Click the single "Load Template" button and load both a road JSON and a pillar JSON. Confirm each auto-detects mode correctly.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec8-build-max-lim">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Build Max Lim Round-Trip:</span> Load a pillar template with <code>buildUntil</code> (e.g. <code>Classic5.json</code>). Verify the values display in the Build Max Lim row, and remain present when exported.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec8-stair-facing">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Stair Facing Round-Trip:</span> Place upside-down and regular stairs in the designer grid facing various directions. Export JSON, re-import, and verify orientations did not rotate.
+          </div>
+        </div>
+        <div class="check-item" data-id="sec8-template-type-tag">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content">
+            <span class="item-title">Template Type Tag:</span> Verify newly exported JSONs contain <code>"type": "road"</code> or <code>"type": "pillar"</code>.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 9 -->
+    <section class="section-card" data-section="9">
+      <div class="section-header">
+        <div class="section-title">9. Default Template Visual Verification</div>
+        <div class="section-count" id="count-sec-9">0/17</div>
+      </div>
+      <div class="checklist-group">
+        <div class="subheading">Road Templates (<code>/lr &lt;road&gt;</code>)</div>
+        <div class="check-item" data-id="sec9-r-basic">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Basic</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-bigbridge">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr BigBridge</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-diamondway">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr DiamondWay</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-glasstunnel">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr GlassTunnel</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-highmetro">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr HighMetro</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-outerwall">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr OuterWall</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-simple3">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Simple3</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-simple5">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Simple5</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-wall">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Wall</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-water5">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Water5</div>
+        </div>
+        <div class="check-item" data-id="sec9-r-wood5">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lr Wood5</div>
+        </div>
+
+        <div class="subheading">Pillar Templates (<code>/lb Basic &lt;pillar&gt;</code>)</div>
+        <div class="check-item" data-id="sec9-p-basic">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic Basic</div>
+        </div>
+        <div class="check-item" data-id="sec9-p-bigbridge">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic BigBridge</div>
+        </div>
+        <div class="check-item" data-id="sec9-p-classic5">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic Classic5</div>
+        </div>
+        <div class="check-item" data-id="sec9-p-fence5">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic Fence5</div>
+        </div>
+        <div class="check-item" data-id="sec9-p-round3">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic Round3</div>
+        </div>
+        <div class="check-item" data-id="sec9-p-wall">
+          <div class="custom-checkbox"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <div class="item-content template-item">/lb Basic Wall</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'lazyroad_regression_testing_checklist_state';
+      const items = Array.from(document.querySelectorAll('.check-item'));
+      const progressBar = document.getElementById('progress-bar-fill');
+      const progressText = document.getElementById('progress-text');
+      const resetBtn = document.getElementById('btn-reset');
+      const filterBtns = document.querySelectorAll('.filter-btn');
+
+      let currentFilter = 'all';
+
+      // Load saved state
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          console.error('Failed to load checklist state from localStorage:', e);
+          return {};
+        }
+      }
+
+      // Save state
+      function saveState(state) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.error('Failed to save checklist state to localStorage:', e);
+        }
+      }
+
+      let state = loadState();
+
+      // Initialize items
+      items.forEach(item => {
+        const id = item.dataset.id;
+        if (state[id]) {
+          item.classList.add('completed');
+        }
+
+        item.addEventListener('click', (e) => {
+          item.classList.toggle('completed');
+          state[id] = item.classList.contains('completed');
+          saveState(state);
+          updateProgress();
+          applyFilter();
+        });
+      });
+
+      // Update progress bar and counters
+      function updateProgress() {
+        const total = items.length;
+        const completed = items.filter(el => el.classList.contains('completed')).length;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        progressBar.style.width = percent + '%';
+        progressText.textContent = `${completed} of ${total} completed (${percent}%)`;
+
+        // Update each section counter
+        for (let i = 1; i <= 9; i++) {
+          const sec = document.querySelector(`section[data-section="${i}"]`);
+          const countBadge = document.getElementById(`count-sec-${i}`);
+          if (sec && countBadge) {
+            const secItems = sec.querySelectorAll('.check-item');
+            const secDone = Array.from(secItems).filter(el => el.classList.contains('completed')).length;
+            countBadge.textContent = `${secDone}/${secItems.length}`;
+            if (secDone === secItems.length && secItems.length > 0) {
+              countBadge.style.background = '#10b981';
+              countBadge.style.color = '#ffffff';
+            } else {
+              countBadge.style.background = 'var(--accent-dim)';
+              countBadge.style.color = 'var(--accent)';
+            }
+          }
+        }
+      }
+
+      // Filter handling
+      function applyFilter() {
+        items.forEach(item => {
+          const isDone = item.classList.contains('completed');
+          if (currentFilter === 'all') {
+            item.style.display = 'flex';
+          } else if (currentFilter === 'pending') {
+            item.style.display = isDone ? 'none' : 'flex';
+          } else if (currentFilter === 'completed') {
+            item.style.display = isDone ? 'flex' : 'none';
+          }
+        });
+      }
+
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          filterBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.filter;
+          applyFilter();
+        });
+      });
+
+      // Reset
+      resetBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to reset all checked items?')) {
+          state = {};
+          saveState(state);
+          items.forEach(item => item.classList.remove('completed'));
+          updateProgress();
+          applyFilter();
+        }
+      });
+
+      // Initial calculation
+      updateProgress();
+      applyFilter();
+    })();
+  </script>
+</body>
+</html>

@@ -2,7 +2,6 @@ package com.creadri.lazyroad;
 
 import com.creadri.lazyroad.commands.LazyMinerCommand;
 import com.creadri.lazyroad.commands.roadCommand;
-import com.creadri.util.FileManager;
 import com.creadri.util.Messages;
 import java.io.*;
 import java.util.List;
@@ -12,6 +11,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.google.gson.Gson;
+import java.nio.file.Files;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.PluginManager;
@@ -39,7 +40,7 @@ public class LazyRoad extends JavaPlugin {
 
         @Override
         public boolean accept(File dir, String name) {
-            return name.endsWith(".ser");
+            return name.endsWith(".json");
         }
     };
     // LazyMiner
@@ -59,9 +60,11 @@ public class LazyRoad extends JavaPlugin {
             roadsDirectory = new File(getDataFolder(), "roads");
             pillarsDirectory = new File(getDataFolder(), "pillars");
 
-            if (!roadsDirectory.exists() || !pillarsDirectory.exists()) {
-                FileManager.copyDefaultRessources(getDataFolder(), "", "defaultRoads.zip", "defaultPillars.zip");
-            }
+            if (!roadsDirectory.exists()) roadsDirectory.mkdirs();
+            if (!pillarsDirectory.exists()) pillarsDirectory.mkdirs();
+
+            PluginUtils.extractResourceZip(this, "defaultRoads.zip", getDataFolder());
+            PluginUtils.extractResourceZip(this, "defaultPillars.zip", getDataFolder());
 
             // load roads and pillars
             loadRoads();
@@ -70,7 +73,7 @@ public class LazyRoad extends JavaPlugin {
             undoSave = new File(getDataFolder(), "undo.dat");
 
             // load undo
-            playerListener.unSerializeRoadsUndos(undoSave);
+            playerListener.deserializeRoadsUndos(undoSave);
 
             if (!getConfig().contains("version")) {
                 this.saveDefaultConfig();
@@ -143,49 +146,51 @@ public class LazyRoad extends JavaPlugin {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
     	List<String> completions = new ArrayList<String>();
+    	String cmdName = cmd.getName().toLowerCase();
+    	String cmdAlias = alias.toLowerCase();
     	
     	if (
-			alias.equalsIgnoreCase("lr") || alias.equalsIgnoreCase("road") || 
-			alias.equalsIgnoreCase("lr") || alias.equalsIgnoreCase("tunnel") || 
-			alias.equalsIgnoreCase("lb") || alias.equalsIgnoreCase("bridge")
+			cmdName.equals("road") || cmdAlias.equals("road") || cmdAlias.equals("lr") || 
+			cmdName.equals("tunnel") || cmdAlias.equals("tunnel") || cmdAlias.equals("lt") || 
+			cmdName.equals("bridge") || cmdAlias.equals("bridge") || cmdAlias.equals("lb")
     	) {
     		if (args.length == 1) {
-	    		if ("reload".startsWith(args[0]))
+	    		if ("reload".startsWith(args[0].toLowerCase()))
 	    			completions.add("reload");
-	    		if ("stop".startsWith(args[0]))
+	    		if ("stop".startsWith(args[0].toLowerCase()))
 	    			completions.add("stop");
-	    		if ("undo".startsWith(args[0]))
+	    		if ("undo".startsWith(args[0].toLowerCase()))
 	    			completions.add("undo");
-	    		if ("straight".startsWith(args[0]))
+	    		if ("straight".startsWith(args[0].toLowerCase()))
 	    			completions.add("straight");
-	    		if ("up".startsWith(args[0]))
+	    		if ("up".startsWith(args[0].toLowerCase()))
 	    			completions.add("up");
-	    		if ("down".startsWith(args[0]))
+	    		if ("down".startsWith(args[0].toLowerCase()))
 	    			completions.add("down");
-	    		if ("normal".startsWith(args[0]))
+	    		if ("normal".startsWith(args[0].toLowerCase()))
 	    			completions.add("normal");
 	    		for (String string : roads.keySet()) {
-	    			if (string.startsWith(args[0]))
+	    			if (string.toLowerCase().startsWith(args[0].toLowerCase()))
 	        			completions.add(string);
 	    		}
     		}
-    		else if (args.length == 2 && (alias.equalsIgnoreCase("lb") || alias.equalsIgnoreCase("bridge"))) {
+    		else if (args.length == 2 && (cmdName.equals("bridge") || cmdAlias.equals("bridge") || cmdAlias.equals("lb"))) {
     			for (String string : pillars.keySet()) {
-	    			if (string.startsWith(args[1]))
+	    			if (string.toLowerCase().startsWith(args[1].toLowerCase()))
 	        			completions.add(string);
 	    		}
     		}
     	}
     	
-    	else if (alias.equalsIgnoreCase("lm") || alias.equalsIgnoreCase("lazyminer")) {
+    	else if (cmdName.equals("lazyminer") || cmdAlias.equals("lazyminer") || cmdAlias.equals("lm")) {
     		if (args.length == 1) {
-    			if ("ids".startsWith(args[0]))
+    			if ("ids".startsWith(args[0].toLowerCase()))
 	    			completions.add("ids");
-    			if ("addid".startsWith(args[0]))
+    			if ("addid".startsWith(args[0].toLowerCase()))
 	    			completions.add("addid");
-    			if ("removeid".startsWith(args[0]))
+    			if ("removeid".startsWith(args[0].toLowerCase()))
 	    			completions.add("removeid");
-    			if ("store".startsWith(args[0]))
+    			if ("store".startsWith(args[0].toLowerCase()))
 	    			completions.add("store");
     		}
     	}
@@ -210,18 +215,15 @@ public class LazyRoad extends JavaPlugin {
 
             try {
                 name = f.getName();
-                name = name.substring(0, name.length() - 4);
+                name = name.substring(0, name.length() - 5);
                 name = name.toLowerCase();
 
-                ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f));
-
-                Road openRoad = (Road) ois.readObject();
-
+                Gson gson = new Gson();
+                String json = Files.readString(f.toPath());
+                Road openRoad = gson.fromJson(json, Road.class);
                 roads.put(name, openRoad);
 
-                ois.close();
-
-            } catch (ClassNotFoundException ex) {
+            } catch (Exception ex) {
                 log.warning("[LazyRoad] An error occured while parsing the road " + name + " !");
             }
         }
@@ -243,18 +245,15 @@ public class LazyRoad extends JavaPlugin {
 
             try {
                 name = f.getName();
-                name = name.substring(0, name.length() - 4);
+                name = name.substring(0, name.length() - 5);
                 name = name.toLowerCase();
 
-                ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f));
-
-                Pillar openPillar = (Pillar) ois.readObject();
-
+                Gson gson = new Gson();
+                String json = Files.readString(f.toPath());
+                Pillar openPillar = gson.fromJson(json, Pillar.class);
                 pillars.put(name, openPillar);
 
-                ois.close();
-
-            } catch (ClassNotFoundException ex) {
+            } catch (Exception ex) {
                 log.warning("[LazyRoad] An error occured while parsing the Pillar " + name + " !");
             }
         }
@@ -277,6 +276,9 @@ public class LazyRoad extends JavaPlugin {
      */
     public String getMessage(String node, Object... values) {
         String msg = getConfig().getString(node);
+        if (msg == null) {
+            return node;
+        }
         msg = replaceColors(msg);
         if (values != null) {
             for (int j = 0; j < values.length; j++) {
@@ -376,8 +378,9 @@ public class LazyRoad extends JavaPlugin {
     public void setRoads(HashMap<String, Road> roads) {
         this.roads = roads;
     }
+
     /**
-     * Gets if the player should not lay the road straight
+     * Gets if the player should lay the road straight
      * @param name
      * @return
      */
@@ -385,7 +388,7 @@ public class LazyRoad extends JavaPlugin {
         return playerPropStraight.contains(name);
     }
     /**
-     * Sets if the player should not lay the road straight
+     * Sets if the player should lay the road straight
      * @param name
      * @param state
      */
